@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>🌲 RUIくんのジャングルレース！</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+  html,body{width:100%;height:100%;overflow:hidden;}
   * { margin:0; padding:0; box-sizing:border-box; touch-action:none; user-select:none; }
-  body { background:#1a3a0a; display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:'Nunito',sans-serif; overflow:hidden; }
-  #wrapper { position:relative; width:100vw; max-width:480px; height:100vh; max-height:860px; overflow:hidden; }
+  body { background:#1a3a0a; font-family:'Nunito',sans-serif; overflow:hidden; }
+  #wrapper { position:fixed; top:0; left:0; right:0; bottom:0; overflow:hidden; }
   canvas { display:block; width:100%; height:100%; }
 
   .screen { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
