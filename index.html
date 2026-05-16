@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🎮 RUIくんのゲームランド！</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: linear-gradient(160deg, #0d1b2a 0%, #1b2838 50%, #0d2200 100%);
+    min-height: 100vh;
+    font-family: 'Nunito', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 0 0 40px;
+    overflow-x: hidden;
+  }
+
+  /* ヘッダー */
+  .header {
+    width: 100%; max-width: 480px;
+    padding: 36px 20px 20px;
+    text-align: center;
+  }
+  .header-icon { font-size: 56px; animation: bounce 2s ease-in-out infinite; display: block; margin-bottom: 8px; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .header-title { color: #f4d35e; font-size: 28px; font-weight: 900; text-shadow: 0 3px 16px rgba(244,211,94,0.5); margin-bottom: 6px; }
+  .header-sub { color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.7; }
+
+  /* 星の背景 */
+  .stars { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .star { position: absolute; background: #fff; border-radius: 50%; animation: twinkle linear infinite; }
+  @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.8} }
+
+  /* ゲームカード */
+  .cards { width: 100%; max-width: 480px; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+
+  .card {
+    border-radius: 24px;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+  .card:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+
+  .card-bg {
+    padding: 22px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* 各ゲームのカラー */
+  .card-shark .card-bg { background: linear-gradient(135deg, #023e8a 0%, #0096c7 100%); }
+  .card-aqua  .card-bg { background: linear-gradient(135deg, #05668d 0%, #00b4d8 100%); }
+  .card-kart  .card-bg { background: linear-gradient(135deg, #1b4332 0%, #40916c 100%); }
+
+  .card-emoji { font-size: 58px; flex-shrink: 0; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+  .card-info { flex: 1; }
+  .card-number { font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 2px; margin-bottom: 3px; }
+  .card-title { font-size: 20px; font-weight: 900; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.3); margin-bottom: 4px; }
+  .card-desc { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.6; }
+  .card-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+  .card-tag { background: rgba(255,255,255,0.18); color: #fff; font-size: 10px; font-weight: 900; border-radius: 8px; padding: 2px 8px; }
+  .card-arrow { font-size: 24px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
+
+  /* NEW バッジ */
+  .new-badge {
+    position: absolute; top: 14px; right: 14px;
+    background: #ff6b6b; color: #fff;
+    font-size: 10px; font-weight: 900;
+    border-radius: 8px; padding: 3px 9px;
+    animation: badgepop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    box-shadow: 0 2px 8px rgba(255,107,107,0.5);
+  }
+  @keyframes badgepop { from{transform:scale(0)} to{transform:scale(1)} }
+
+  /* 波線デコレーション */
+  .card-wave {
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+  }
+  .card-shark .card-wave { background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.2), rgba(255,255,255,0.05)); }
+
+  /* フッター */
+  .footer {
+    margin-top: 32px;
+    text-align: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 12px;
+    line-height: 1.8;
+    position: relative; z-index: 1;
+  }
+  .footer-emoji { font-size: 24px; display: block; margin-bottom: 6px; }
+
+  /* タイトル下の装飾 */
+  .title-deco {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 12px 0 24px;
+  }
+  .deco-line { width: 50px; height: 2px; background: rgba(244,211,94,0.3); border-radius: 2px; }
+  .deco-star { color: #f4d35e; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<!-- 星の背景 -->
+<div class="stars" id="stars"></div>
+
+<!-- ヘッダー -->
+<div class="header">
+  <span class="header-icon">🎮</span>
+  <div class="header-title">RUIくんの<br>ゲームランド！</div>
+  <div class="title-deco">
+    <div class="deco-line"></div>
+    <span class="deco-star">⭐</span>
+    <div class="deco-line"></div>
+  </div>
+  <div class="header-sub">あそびたいゲームをえらんでね！<br>ぜんぶで3つのゲームがあるよ🌟</div>
+</div>
+
+<!-- ゲームカード -->
+<div class="cards">
+
+  <!-- ゲーム1：サメ大冒険 -->
+  <a class="card card-shark" href="shark_adventure_phase2.html">
+    <div class="new-badge" style="animation-delay:0.1s">🦈 ゲーム1</div>
+    <div class="card-bg">
+      <div class="card-emoji">🦈</div>
+      <div class="card-info">
+        <div class="card-number">GAME 01</div>
+        <div class="card-title">サメくん大冒険！</div>
+        <div class="card-desc">サメをスワイプで動かして<br>おさかなを食べてたからばこを集めよう！</div>
+        <div class="card-tags">
+          <span class="card-tag">スワイプ</span>
+          <span class="card-tag">アクション</span>
+          <span class="card-tag">🐟 さかな</span>
+        </div>
+      </div>
+      <div class="card-arrow">▶</div>
+    </div>
+    <div class="card-wave"></div>
+  </a>
+
+  <!-- ゲーム2：水族館 -->
+  <a class="card card-aqua" href="aquarium_phase3.html">
+    <div class="new-badge" style="animation-delay:0.2s">🐠 ゲーム2</div>
+    <div class="card-bg">
+      <div class="card-emoji">🐠</div>
+      <div class="card-info">
+        <div class="card-number">GAME 02</div>
+        <div class="card-title">おさかな水族館を<br>つくろう！</div>
+        <div class="card-desc">ミニゲームをクリアして<br>じぶんだけの水族館を育てよう！</div>
+        <div class="card-tags">
+          <span class="card-tag">育成</span>
+          <span class="card-tag">ミニゲーム5種</span>
+          <span class="card-tag">🌊 水族館</span>
+        </div>
+      </div>
+      <div class="card-arrow">▶</div>
+    </div>
+    <div class="card-wave"></div>
+  </a>
+
+  <!-- ゲーム3：カートレース -->
+  <a class="card card-kart" href="rui_kart_phase3.html">
+    <div class="new-badge" style="animation-delay:0.3s">🏎️ ゲーム3</div>
+    <div class="card-bg">
+      <div class="card-emoji">🏎️</div>
+      <div class="card-info">
+        <div class="card-number">GAME 03</div>
+        <div class="card-title">RUIくんの<br>ジャングルレース！</div>
+        <div class="card-desc">カートでジャングルをかっとばせ！<br>障害物をよけてゴールをめざそう！</div>
+        <div class="card-tags">
+          <span class="card-tag">タップ</span>
+          <span class="card-tag">レース</span>
+          <span class="card-tag">🌲 ジャングル</span>
+        </div>
+      </div>
+      <div class="card-arrow">▶</div>
+    </div>
+    <div class="card-wave"></div>
+  </a>
+
+</div>
+
+<!-- フッター -->
+<div class="footer">
+  <span class="footer-emoji">🌟</span>
+  RUIくんのためだけにつくったゲームだよ！<br>
+  たのしんでね💕
+</div>
+
+<script>
+// 星を生成
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 60; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = 1 + Math.random() * 3;
+  s.style.cssText = `
+    width:${size}px; height:${size}px;
+    left:${Math.random()*100}%;
+    top:${Math.random()*100}%;
+    animation-duration:${2+Math.random()*4}s;
+    animation-delay:${Math.random()*4}s;
+    opacity:${0.2+Math.random()*0.6};
+  `;
+  starsEl.appendChild(s);
+}
+</script>
+</body>
+</html>
