@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🌲 RUIくんのジャングルレース！</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; touch-action:none; user-select:none; }
+  body { background:#1a3a0a; display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:'Nunito',sans-serif; overflow:hidden; }
+  #wrapper { position:relative; width:100vw; max-width:480px; height:100vh; max-height:860px; overflow:hidden; }
+  canvas { display:block; width:100%; height:100%; }
+
+  .screen { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .screen.hidden { display:none; }
+
+  /* タイトル */
+  #titleScreen { background:linear-gradient(180deg,#0d2200 0%,#1a4a05 50%,#2d7a0a 100%); }
+  .title-trees { font-size:52px; letter-spacing:4px; margin-bottom:8px; animation:treesway 2s ease-in-out infinite; }
+  @keyframes treesway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+  .title-main { color:#f4d35e; font-size:26px; font-weight:900; text-align:center; text-shadow:0 3px 12px rgba(0,0,0,0.6); margin-bottom:4px; }
+  .title-sub { color:rgba(255,255,255,0.75); font-size:13px; text-align:center; line-height:1.8; margin-bottom:28px; }
+  .btn-start { background:linear-gradient(135deg,#f4d35e,#f77f00); color:#fff; border:none; border-radius:30px; padding:14px 44px; font-size:22px; font-weight:900; font-family:'Nunito',sans-serif; cursor:pointer; box-shadow:0 4px 20px rgba(244,211,94,0.5); }
+  .btn-start:active { transform:scale(0.95); }
+
+  /* HUD */
+  #hud { position:absolute; top:0; left:0; right:0; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; z-index:10; }
+  #heartDisplay { display:flex; gap:4px; }
+  .heart { font-size:22px; transition:transform 0.2s; filter:drop-shadow(0 1px 4px rgba(0,0,0,0.4)); }
+  .heart.lost { filter:grayscale(1) opacity(0.35); }
+  #distDisplay { background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); border-radius:16px; padding:4px 14px; color:#f4d35e; font-size:15px; font-weight:900; }
+
+  /* ゲームオーバー・クリア */
+  #gameoverScreen { background:rgba(10,30,5,0.92); backdrop-filter:blur(10px); }
+  #clearScreen { background:rgba(10,30,5,0.92); backdrop-filter:blur(10px); }
+  .end-emoji { font-size:72px; animation:epop 0.7s cubic-bezier(0.34,1.56,0.64,1) both; }
+  @keyframes epop { from{transform:scale(0) rotate(-10deg)} to{transform:scale(1) rotate(0)} }
+  .end-title { color:#fff; font-size:28px; font-weight:900; text-align:center; margin:10px 0 6px; text-shadow:0 2px 12px rgba(0,0,0,0.5); }
+  .end-reason { font-size:18px; font-weight:900; text-align:center; border-radius:14px; padding:12px 28px; margin:10px 0 18px; }
+  .reason-crash { background:rgba(226,75,74,0.2); border:2px solid #E24B4A; color:#F09595; }
+  .reason-clear { background:rgba(244,211,94,0.2); border:2px solid #f4d35e; color:#f4d35e; }
+  .end-score { color:rgba(255,255,255,0.7); font-size:14px; margin-bottom:20px; text-align:center; line-height:1.7; }
+  .btn-row { display:flex; gap:10px; }
+  .btn-green { background:linear-gradient(135deg,#4CAF50,#2E7D32); color:#fff; border:none; border-radius:26px; padding:12px 28px; font-size:17px; font-weight:900; font-family:'Nunito',sans-serif; cursor:pointer; }
+  .btn-gray { background:rgba(255,255,255,0.1); color:#fff; border:2px solid rgba(255,255,255,0.25); border-radius:26px; padding:12px 22px; font-size:17px; font-weight:900; font-family:'Nunito',sans-serif; cursor:pointer; }
+  .btn-green:active,.btn-gray:active { transform:scale(0.95); }
+
+  /* 操作ヒント */
+  #hint { position:absolute; bottom:18px; left:0; right:0; text-align:center; color:rgba(255,255,255,0.4); font-size:12px; pointer-events:none; }
+
+  /* エフェクト */
+  .dmg-flash { position:absolute; top:0;left:0;right:0;bottom:0; background:rgba(226,75,74,0.35); pointer-events:none; animation:dflash 0.3s ease-out forwards; }
+  @keyframes dflash { 0%{opacity:1} 100%{opacity:0} }
+  .score-pop { position:absolute; color:#f4d35e; font-size:20px; font-weight:900; font-family:'Nunito',sans-serif; pointer-events:none; animation:spop 0.8s ease-out forwards; transform:translateX(-50%); }
+  @keyframes spop { 0%{transform:translateX(-50%) translateY(0) scale(1.2);opacity:1} 100%{transform:translateX(-50%) translateY(-50px) scale(0.8);opacity:0} }
+  .confetti { position:absolute; width:9px; height:9px; pointer-events:none; border-radius:2px; animation:cffall linear forwards; }
+  @keyframes cffall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(900px) rotate(720deg);opacity:0} }
+
+  /* フェーズ3追加スタイル */
+  #scoreDisplay { background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); border-radius:16px; padding:4px 12px; color:#f4d35e; font-size:14px; font-weight:900; }
+  #timerDisplay { background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); border-radius:16px; padding:4px 12px; color:#fff; font-size:14px; font-weight:900; }
+  #timerDisplay.urgent { color:#ff6b6b; animation:tpulse 0.4s ease-in-out infinite alternate; }
+  @keyframes tpulse { from{transform:scale(1)} to{transform:scale(1.12)} }
+  #comboDisplay { position:absolute; top:56px; right:14px; pointer-events:none; transition:opacity 0.3s; }
+  .combo-badge { background:linear-gradient(135deg,#f4d35e,#f77f00); color:#fff; border-radius:12px; padding:3px 12px; font-size:13px; font-weight:900; animation:combopop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes combopop { from{transform:scale(0.7)} to{transform:scale(1)} }
+  #countdownScreen { position:absolute; top:0;left:0;right:0;bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  .countdown-num { font-size:120px; font-weight:900; color:#fff; text-shadow:0 4px 24px rgba(0,0,0,0.6); animation:cdpop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; font-family:'Nunito',sans-serif; }
+  @keyframes cdpop { from{transform:scale(0.3);opacity:0} to{transform:scale(1);opacity:1} }
+  .hs-badge { display:inline-block; background:#f4d35e; color:#412402; border-radius:8px; padding:2px 10px; font-size:12px; font-weight:900; margin-left:6px; animation:combopop 0.4s 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+  #speedDisplay { position:absolute; bottom:36px; right:14px; background:rgba(0,0,0,0.35); border-radius:12px; padding:4px 10px; color:#90e0ef; font-size:12px; font-weight:900; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="heartDisplay">
+      <span class="heart" id="h1">❤️</span>
+      <span class="heart" id="h2">❤️</span>
+      <span class="heart" id="h3">❤️</span>
+    </div>
+    <div id="scoreDisplay">🏅 0</div>
+    <div id="timerDisplay">⏱ 0:00</div>
+    <div id="distDisplay">🌲 0m</div>
+  </div>
+  <div id="stageDisplay" style="position:absolute;top:52px;left:14px;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);border-radius:14px;padding:3px 12px;color:#fff;font-size:12px;font-weight:900;pointer-events:none;"></div>
+  <div id="starHud" class="hidden" style="position:absolute;top:52px;left:0;right:0;text-align:center;pointer-events:none;">
+    <span style="background:rgba(244,211,94,0.9);border-radius:20px;padding:4px 16px;font-size:14px;font-weight:900;color:#412402;">⭐ むてき！</span>
+  </div>
+  <div id="comboDisplay" class="hidden"></div>
+  <div id="speedDisplay" class="hidden">🏎️ 0km/h</div>
+  <div id="countdownScreen" class="hidden"></div>
+
+  <!-- タイトル -->
+  <div class="screen" id="titleScreen">
+    <div class="title-trees">🌴🌲🌿</div>
+    <div class="title-main">RUIくんの<br>ジャングルレース！</div>
+    <div id="titleHscore" style="color:#f4d35e;font-size:13px;font-weight:900;margin-bottom:8px;display:none;">🏆 ハイスコア：<span id="hsDisplay">0</span></div>
+    <div class="title-sub">
+      カートでジャングルをはしろう！🏎️<br>
+      タップでジャンプ・スワイプでしゃがむ<br>
+      🍌バナナ回復・⭐むてき・コンボでボーナス！
+    </div>
+    <button class="btn-start" onclick="showStageSelect()">▶ スタート！</button>
+  </div>
+
+  <!-- ステージ選択 -->
+  <div class="screen hidden" id="stageSelectScreen" style="background:rgba(10,30,5,0.95);backdrop-filter:blur(10px);">
+    <div style="color:#f4d35e;font-size:22px;font-weight:900;margin-bottom:4px;">🌲 ステージをえらぼう！</div>
+    <div style="color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:18px;">クリアすると次のステージへ！タイムをきろくしよう！</div>
+    <div style="display:flex;flex-direction:column;gap:10px;width:85%;">
+      <button onclick="startWithCountdown(0)" style="background:rgba(39,80,10,0.8);border:2px solid #4a9a1a;color:#fff;border-radius:16px;padding:14px 18px;font-size:15px;font-weight:900;font-family:'Nunito',sans-serif;cursor:pointer;text-align:left;">
+        🌿 ステージ１　<span style="font-size:11px;opacity:0.7;">ジャングルのいりぐち ★☆☆</span><br>
+        <span id="hs0" style="font-size:11px;color:#90e0ef;font-weight:700;"></span>
+      </button>
+      <button onclick="startWithCountdown(1)" style="background:rgba(20,55,8,0.8);border:2px solid #2d7a0a;color:#fff;border-radius:16px;padding:14px 18px;font-size:15px;font-weight:900;font-family:'Nunito',sans-serif;cursor:pointer;text-align:left;">
+        🌴 ステージ２　<span style="font-size:11px;opacity:0.7;">ふかいジャングル ★★☆</span><br>
+        <span id="hs1" style="font-size:11px;color:#90e0ef;font-weight:700;"></span>
+      </button>
+      <button onclick="startWithCountdown(2)" style="background:rgba(13,34,0,0.8);border:2px solid #1a4a05;color:#fff;border-radius:16px;padding:14px 18px;font-size:15px;font-weight:900;font-family:'Nunito',sans-serif;cursor:pointer;text-align:left;">
+        🏁 ステージ３　<span style="font-size:11px;opacity:0.7;">ジャングルのおくち ★★★</span><br>
+        <span id="hs2" style="font-size:11px;color:#90e0ef;font-weight:700;"></span>
+      </button>
+    </div>
+    <button onclick="showTitle()" style="color:rgba(255,255,255,0.45);background:none;border:none;font-size:13px;font-family:'Nunito',sans-serif;margin-top:14px;cursor:pointer;">← もどる</button>
+  </div>
+
+  <!-- ゲームオーバー -->
+  <div class="screen hidden" id="gameoverScreen">
+    <div class="end-emoji">😵</div>
+    <div class="end-title">ゲームオーバー</div>
+    <div class="end-reason reason-crash" id="goReason">🪨 いわにぶつかった！</div>
+    <div class="end-score" id="goScore"></div>
+    <div class="btn-row">
+      <button class="btn-green" id="btnRetry" onclick="startGame(currentStage)">🔄 もういちど</button>
+      <button class="btn-gray" onclick="showTitle()">🏠 タイトル</button>
+    </div>
+  </div>
+
+  <!-- ステージクリア -->
+  <div class="screen hidden" id="clearScreen">
+    <div class="end-emoji">🎉</div>
+    <div class="end-title" id="clearTitle">ステージクリア！</div>
+    <div class="end-reason reason-clear" id="clearReason">🏁 ゴール！</div>
+    <div class="end-score" id="clearScore"></div>
+    <div class="btn-row" id="clearBtns"></div>
+  </div>
+
+  <!-- 全クリア -->
+  <div class="screen hidden" id="allClearScreen" style="background:rgba(10,30,5,0.95);backdrop-filter:blur(10px);">
+    <div class="end-emoji">🏆</div>
+    <div class="end-title" style="color:#f4d35e;">ぜんぶクリア！</div>
+    <div style="font-size:48px;margin:10px 0;">🌲🏎️🌲</div>
+    <div class="end-reason reason-clear">⭐ RUIくんさいきょう！ ⭐</div>
+    <div class="end-score">ジャングルのおくまでたどりついたよ！<br>すごい！やったね！🎊</div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn-green" onclick="showStageSelect()">🔄 もういちど</button>
+      <button class="btn-gray" onclick="showTitle()">🏠 タイトル</button>
+    </div>
+  </div>
+
+  <div id="hint" class="hidden">👆 タップでジャンプ！　⬇ スワイプでしゃがむ！</div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('wrapper');
+
+// ===== リサイズ =====
+function resize() {
+  canvas.width = wrapper.clientWidth;
+  canvas.height = wrapper.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ===== ゲーム状態 =====
+let state = 'title';
+let hp = 3;
+let distance = 0;
+let speed = 0;
+let baseSpeed = 220;
+let invincible = 0;
+let animId;
+let lastTime = 0;
+
+// フェーズ3追加
+let score = 0;
+let elapsedTime = 0;
+let combo = 0;
+let comboTimer = 0;
+let obstaclesCleared = 0; // ジャンプ回避カウント
+
+// ハイスコア（localStorage）
+const HS_KEY = 'ruiKartHS';
+let highScores = { 0: null, 1: null, 2: null }; // ステージごとのベストタイム
+try {
+  const saved = localStorage.getItem(HS_KEY);
+  if (saved) highScores = JSON.parse(saved);
+} catch(e) {}
+
+function saveHS(stage, time) {
+  if (!highScores[stage] || time < highScores[stage]) {
+    highScores[stage] = time;
+    try { localStorage.setItem(HS_KEY, JSON.stringify(highScores)); } catch(e) {}
+    return true; // 新記録
+  }
+  return false;
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.floor((sec % 1) * 10);
+  return `${m}:${String(s).padStart(2,'0')}.${ms}`;
+}
+
+// ===== ステージ設定 =====
+const STAGES = [
+  { name:'🌿 ジャングルのいりぐち', goal:400,  baseSpeed:200, obInterval:2.0, label:'ステージ１', color:'#27500A' },
+  { name:'🌴 ふかいジャングル',     goal:700,  baseSpeed:260, obInterval:1.5, label:'ステージ２', color:'#1a3a0a' },
+  { name:'🏁 ジャングルのおくち',   goal:1000, baseSpeed:320, obInterval:1.1, label:'ステージ３', color:'#0d2200' },
+];
+let currentStage = 0;
+let goalDist = 400;
+
+// ===== カート・RUIくん =====
+const kart = {
+  x: 0, y: 0,
+  w: 72, h: 52,
+  vy: 0,
+  grounded: true,
+  jumping: false,
+  ducking: false,
+  duckTimer: 0,
+  jumpHeld: false,
+  jumpTime: 0,
+  crashed: false,
+  crashAnim: 0,
+  frame: 0,
+  starTimer: 0, // 無敵スター
+};
+
+// ===== 地面 =====
+let groundY = 0;
+
+// ===== 障害物・アイテム =====
+let obstacles = [];
+let items = [];
+let obSpawnTimer = 0;
+let obSpawnInterval = 1.8;
+let itemSpawnTimer = 4;
+
+// ===== 背景スクロール =====
+let bgLayers = [];
+
+// ===== タッチ =====
+let touchStartY = 0;
+let touchStartTime = 0;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (state !== 'play') return;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+  kart.jumpHeld = true;
+  if (kart.grounded && !kart.jumping) {
+    doJump();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (state !== 'play') return;
+  const dy = e.touches[0].clientY - touchStartY;
+  if (dy > 30) {
+    kart.ducking = true;
+    kart.duckTimer = 0.4;
+    kart.jumpHeld = false;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  kart.jumpHeld = false;
+}, { passive: false });
+
+// マウス（デスクトップテスト）
+canvas.addEventListener('mousedown', e => {
+  if (state !== 'play') return;
+  touchStartY = e.clientY;
+  kart.jumpHeld = true;
+  if (kart.grounded && !kart.jumping) doJump();
+});
+canvas.addEventListener('mousemove', e => {
+  if (!kart.jumpHeld || state !== 'play') return;
+  const dy = e.clientY - touchStartY;
+  if (dy > 30) { kart.ducking = true; kart.duckTimer = 0.4; kart.jumpHeld = false; }
+});
+canvas.addEventListener('mouseup', () => { kart.jumpHeld = false; });
+
+function doJump() {
+  kart.vy = -520;
+  kart.grounded = false;
+  kart.jumping = true;
+  kart.jumpTime = 0;
+  playSfx('jump');
+}
+
+// ===== 初期化 =====
+function initBg() {
+  const W = canvas.width, H = canvas.height;
+  groundY = H * 0.72;
+  // 視差レイヤー（遠景木・中景木）
+  bgLayers = [
+    { trees: Array.from({length:8}, (_,i) => ({ x: i*(W/6), size: 0.5+Math.random()*0.3, type: Math.random()>0.5?'palm':'tree' })), speed: 0.2, y: H*0.25 },
+    { trees: Array.from({length:6}, (_,i) => ({ x: i*(W/4)+Math.random()*40, size: 0.7+Math.random()*0.2, type: Math.random()>0.5?'palm':'tree' })), speed: 0.5, y: H*0.38 },
+  ];
+}
+
+function startGame(stageNum = 0) {
+  currentStage = stageNum;
+  const stage = STAGES[currentStage];
+  goalDist = stage.goal;
+  baseSpeed = stage.baseSpeed;
+
+  ['titleScreen','gameoverScreen','clearScreen','allClearScreen','stageSelectScreen'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.classList.add('hidden');
+  });
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('hint').classList.remove('hidden');
+  document.getElementById('starHud').classList.add('hidden');
+  document.getElementById('comboDisplay').classList.add('hidden');
+  document.getElementById('speedDisplay').classList.remove('hidden');
+
+  state = 'play';
+  hp = 3;
+  distance = 0;
+  speed = baseSpeed;
+  invincible = 0;
+  obstacles = [];
+  items = [];
+  obSpawnTimer = 0;
+  obSpawnInterval = stage.obInterval;
+  itemSpawnTimer = 4 + Math.random() * 3;
+  kart.starTimer = 0;
+
+  // フェーズ3初期化
+  score = 0;
+  elapsedTime = 0;
+  combo = 0;
+  comboTimer = 0;
+  obstaclesCleared = 0;
+
+  const W = canvas.width, H = canvas.height;
+  groundY = H * 0.72;
+  kart.x = W * 0.22;
+  kart.y = groundY - kart.h;
+  kart.vy = 0;
+  kart.grounded = true;
+  kart.jumping = false;
+  kart.ducking = false;
+  kart.duckTimer = 0;
+  kart.jumpHeld = false;
+  kart.crashed = false;
+  kart.crashAnim = 0;
+  kart.frame = 0;
+
+  document.getElementById('stageDisplay').textContent = stage.label;
+  document.getElementById('scoreDisplay').textContent = '🏅 0';
+  document.getElementById('timerDisplay').textContent = '⏱ 0:00.0';
+  document.getElementById('timerDisplay').classList.remove('urgent');
+
+  initBg();
+  updateHp();
+  updateDist();
+
+  cancelAnimationFrame(animId);
+  lastTime = performance.now();
+  animId = requestAnimationFrame(loop);
+}
+
+function showTitle() {
+  ['gameoverScreen','clearScreen','allClearScreen','hud','hint','starHud','stageSelectScreen',
+   'comboDisplay','speedDisplay','countdownScreen'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.classList.add('hidden');
+  });
+  document.getElementById('titleScreen').classList.remove('hidden');
+  // ハイスコア表示
+  const best = Object.values(highScores).filter(v=>v!==null);
+  if (best.length > 0) {
+    document.getElementById('titleHscore').style.display = 'block';
+    document.getElementById('hsDisplay').textContent = fmtTime(Math.min(...best));
+  }
+  state = 'title';
+  cancelAnimationFrame(animId);
+}
+
+function showStageSelect() {
+  ['titleScreen','gameoverScreen','clearScreen','allClearScreen','hud','hint','starHud',
+   'comboDisplay','speedDisplay','countdownScreen'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.classList.add('hidden');
+  });
+  // ベストタイムを各ステージボタンに表示
+  [0,1,2].forEach(i => {
+    const el = document.getElementById(`hs${i}`);
+    if (el) el.textContent = highScores[i] ? `🏅 ベスト：${fmtTime(highScores[i])}` : '';
+  });
+  document.getElementById('stageSelectScreen').classList.remove('hidden');
+}
+
+// カウントダウン → ゲーム開始
+function startWithCountdown(stageNum) {
+  document.getElementById('stageSelectScreen').classList.add('hidden');
+  const cd = document.getElementById('countdownScreen');
+  cd.classList.remove('hidden');
+  cd.innerHTML = '';
+  let count = 3;
+  function tick() {
+    cd.innerHTML = `<div class="countdown-num">${count}</div>`;
+    playSfx('jump');
+    count--;
+    if (count >= 0) {
+      setTimeout(tick, 700);
+    } else {
+      cd.innerHTML = `<div class="countdown-num" style="color:#f4d35e;font-size:80px;">GO！</div>`;
+      setTimeout(() => {
+        cd.classList.add('hidden');
+        startGame(stageNum);
+      }, 600);
+    }
+  }
+  tick();
+}
+
+// ===== 効果音 =====
+let audioCtx = null;
+function getAC() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+function playSfx(name) {
+  try {
+    const ac = getAC();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    if (name === 'jump') {
+      o.type = 'sine'; o.frequency.setValueAtTime(300, ac.currentTime); o.frequency.exponentialRampToValueAtTime(600, ac.currentTime + 0.12);
+      g.gain.setValueAtTime(0.2, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.18);
+      o.start(); o.stop(ac.currentTime + 0.18);
+    } else if (name === 'hit') {
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(250, ac.currentTime); o.frequency.exponentialRampToValueAtTime(80, ac.currentTime + 0.25);
+      g.gain.setValueAtTime(0.25, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
+      o.start(); o.stop(ac.currentTime + 0.3);
+    } else if (name === 'item') {
+      o.type = 'sine'; o.frequency.setValueAtTime(600, ac.currentTime); o.frequency.exponentialRampToValueAtTime(1000, ac.currentTime + 0.15);
+      g.gain.setValueAtTime(0.2, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.2);
+      o.start(); o.stop(ac.currentTime + 0.2);
+    } else if (name === 'star') {
+      [800,1000,1200,1000,800].forEach((f,i) => {
+        const o2=ac.createOscillator(),g2=ac.createGain(); o2.connect(g2); g2.connect(ac.destination);
+        o2.type='sine'; o2.frequency.value=f;
+        g2.gain.setValueAtTime(0.15,ac.currentTime+i*0.06); g2.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.06+0.1);
+        o2.start(ac.currentTime+i*0.06); o2.stop(ac.currentTime+i*0.06+0.1);
+      });
+    } else if (name === 'clear') {
+      [523,659,784,1047].forEach((f,i) => {
+        const o2=ac.createOscillator(),g2=ac.createGain(); o2.connect(g2); g2.connect(ac.destination);
+        o2.type='sine'; o2.frequency.value=f;
+        g2.gain.setValueAtTime(0.18,ac.currentTime+i*0.12); g2.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.12+0.25);
+        o2.start(ac.currentTime+i*0.12); o2.stop(ac.currentTime+i*0.12+0.25);
+      });
+    } else if (name === 'allclear') {
+      [523,659,784,659,784,1047].forEach((f,i) => {
+        const o2=ac.createOscillator(),g2=ac.createGain(); o2.connect(g2); g2.connect(ac.destination);
+        o2.type='sine'; o2.frequency.value=f;
+        g2.gain.setValueAtTime(0.2,ac.currentTime+i*0.14); g2.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.14+0.28);
+        o2.start(ac.currentTime+i*0.14); o2.stop(ac.currentTime+i*0.14+0.28);
+      });
+    }
+  } catch(e) {}
+}
+
+// ===== メインループ =====
+function loop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  if (state !== 'play') return;
+  update(dt);
+  render();
+  animId = requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  const W = canvas.width, H = canvas.height;
+  groundY = H * 0.72;
+
+  // 距離・スピード・タイム
+  distance += speed * dt;
+  speed = baseSpeed + distance * 0.04;
+  elapsedTime += dt;
+  if (invincible > 0) invincible -= dt;
+
+  // スコア（走行で少しずつ加算）
+  score += Math.floor(speed * dt * 0.1);
+
+  // コンボタイマー
+  if (comboTimer > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) { combo = 0; document.getElementById('comboDisplay').classList.add('hidden'); }
+  }
+
+  // カートアニメフレーム
+  kart.frame += dt * 12;
+
+  // タイマー表示更新
+  const timerEl = document.getElementById('timerDisplay');
+  timerEl.textContent = `⏱ ${fmtTime(elapsedTime)}`;
+  timerEl.classList.toggle('urgent', elapsedTime > goalDist / 2);
+
+  // スコア表示
+  document.getElementById('scoreDisplay').textContent = `🏅 ${score}`;
+
+  // 速度表示（km/h換算）
+  document.getElementById('speedDisplay').textContent = `🏎️ ${Math.floor(speed * 0.36)}km/h`;
+
+  // スタータイマー
+  if (kart.starTimer > 0) {
+    kart.starTimer -= dt;
+    if (kart.starTimer <= 0) {
+      kart.starTimer = 0;
+      document.getElementById('starHud').classList.add('hidden');
+    }
+  }
+
+  // ジャンプ（長押しで高く）
+  if (kart.jumping && kart.jumpHeld) {
+    kart.jumpTime += dt;
+    if (kart.jumpTime < 0.18) kart.vy -= 600 * dt;
+  }
+
+  // 重力
+  kart.vy += 1100 * dt;
+  kart.y += kart.vy * dt;
+
+  // 地面着地
+  const kartGroundY = groundY - (kart.ducking ? kart.h * 0.6 : kart.h);
+  if (kart.y >= kartGroundY) {
+    kart.y = kartGroundY;
+    kart.vy = 0;
+    kart.grounded = true;
+    kart.jumping = false;
+    kart.jumpTime = 0;
+  } else {
+    kart.grounded = false;
+  }
+
+  // しゃがみタイマー
+  if (kart.ducking) {
+    kart.duckTimer -= dt;
+    if (kart.duckTimer <= 0) kart.ducking = false;
+  }
+
+  // 障害物スポーン
+  obSpawnTimer -= dt;
+  if (obSpawnTimer <= 0) {
+    spawnObstacle();
+    const stage = STAGES[currentStage];
+    obSpawnInterval = stage.obInterval * (0.7 + Math.random() * 0.8);
+    obSpawnTimer = obSpawnInterval;
+  }
+
+  // アイテムスポーン
+  itemSpawnTimer -= dt;
+  if (itemSpawnTimer <= 0) {
+    spawnItem();
+    itemSpawnTimer = 5 + Math.random() * 4;
+  }
+
+  // 障害物更新
+  for (const ob of obstacles) {
+    ob.x -= speed * dt;
+    ob.anim += dt * 3;
+    // ワニは動く
+    if (ob.type === 'croc') {
+      ob.x += Math.sin(ob.anim * 0.5) * 0.5;
+    }
+  }
+  // 障害物が画面外に出たら「よけた！」コンボ加算
+  const before = obstacles.length;
+  obstacles = obstacles.filter(ob => {
+    if (ob.x + ob.w < kart.x - 10 && !ob.passed) {
+      ob.passed = true;
+      combo++;
+      comboTimer = 2.0;
+      score += combo * 10;
+      if (combo >= 3) {
+        const cdEl = document.getElementById('comboDisplay');
+        cdEl.classList.remove('hidden');
+        cdEl.innerHTML = `<div class="combo-badge">${combo}コンボ！ +${combo*10}</div>`;
+      }
+      obstaclesCleared++;
+    }
+    return ob.x > -120;
+  });
+
+  // アイテム更新
+  for (const it of items) {
+    it.x -= speed * dt;
+    it.bob += dt * 3;
+  }
+  items = items.filter(it => it.x > -80);
+
+  // 衝突判定（スター中は無敵）
+  const canHit = invincible <= 0 && kart.starTimer <= 0;
+  if (canHit) {
+    for (const ob of obstacles) {
+      if (hitTest(ob)) {
+        hp--;
+        invincible = 1.8;
+        combo = 0; comboTimer = 0;
+        document.getElementById('comboDisplay').classList.add('hidden');
+        updateHp();
+        playSfx('hit');
+        spawnDmgFlash();
+        if (hp <= 0) { gameOver('obstacle', ob.type); return; }
+        break;
+      }
+    }
+  }
+
+  // アイテム取得
+  for (const it of items) {
+    if (!it.taken && itemHitTest(it)) {
+      it.taken = true;
+      if (it.type === 'banana') {
+        if (hp < 3) { hp++; updateHp(); }
+        score += 50;
+        playSfx('item');
+        spawnItemPop(it.x, it.y, '❤️ +50');
+      } else if (it.type === 'star') {
+        kart.starTimer = 5;
+        score += 100;
+        playSfx('star');
+        document.getElementById('starHud').classList.remove('hidden');
+        spawnItemPop(it.x, it.y, '⭐ +100');
+      }
+    }
+  }
+  items = items.filter(it => !it.taken);
+
+  // ゴール判定
+  if (distance >= goalDist * 100) {
+    stageClear();
+    return;
+  }
+
+  // 背景スクロール
+  for (const layer of bgLayers) {
+    for (const t of layer.trees) {
+      t.x -= speed * layer.speed * dt;
+      if (t.x < -100) t.x += canvas.width + 100 + Math.random() * 100;
+    }
+  }
+
+  updateDist();
+}
+
+function itemHitTest(it) {
+  const kx = kart.x - kart.w * 0.3;
+  const ky = kart.y;
+  const kw = kart.w * 0.6;
+  const kh = kart.h;
+  return it.x + 20 > kx && it.x - 20 < kx + kw && it.y + 20 > ky && it.y - 20 < ky + kh;
+}
+
+function hitTest(ob) {
+  const kx = kart.x - kart.w * 0.3;
+  const ky = kart.y + (kart.ducking ? kart.h * 0.4 : 0);
+  const kw = kart.w * 0.6;
+  const kh = kart.ducking ? kart.h * 0.5 : kart.h * 0.85;
+
+  return ob.x < kx + kw && ob.x + ob.w > kx &&
+         ob.y < ky + kh && ob.y + ob.h > ky;
+}
+
+// ===== 障害物スポーン =====
+const OB_TYPES_S1 = [
+  { type:'rock',  emoji:'🪨', w:52, h:44, label:'いわ' },
+  { type:'cactus',emoji:'🌵', w:40, h:60, label:'サボテン' },
+];
+const OB_TYPES_S2 = [
+  { type:'rock',  emoji:'🪨', w:52, h:44, label:'いわ' },
+  { type:'cactus',emoji:'🌵', w:40, h:60, label:'サボテン' },
+  { type:'log',   emoji:'🪵', w:58, h:38, label:'まるた' },
+  { type:'croc',  emoji:'🐊', w:60, h:40, label:'ワニ' },
+];
+const OB_TYPES_S3 = [
+  { type:'rock',  emoji:'🪨', w:52, h:44, label:'いわ' },
+  { type:'cactus',emoji:'🌵', w:40, h:60, label:'サボテン' },
+  { type:'log',   emoji:'🪵', w:58, h:38, label:'まるた' },
+  { type:'croc',  emoji:'🐊', w:60, h:40, label:'ワニ' },
+  { type:'rock',  emoji:'🪨', w:52, h:44, label:'いわ' }, // 出現率アップ
+];
+
+function spawnObstacle() {
+  const W = canvas.width;
+  const pool = currentStage === 0 ? OB_TYPES_S1 : currentStage === 1 ? OB_TYPES_S2 : OB_TYPES_S3;
+  const def = pool[Math.floor(Math.random() * pool.length)];
+  obstacles.push({
+    ...def,
+    x: W + 20,
+    y: groundY - def.h,
+    anim: 0,
+  });
+}
+
+function spawnItem() {
+  const W = canvas.width;
+  const type = Math.random() < 0.4 ? 'star' : 'banana';
+  items.push({
+    type,
+    emoji: type === 'star' ? '⭐' : '🍌',
+    x: W + 20,
+    y: groundY - 55 - Math.random() * 30,
+    bob: Math.random() * Math.PI * 2,
+    taken: false,
+  });
+}
+
+function spawnItemPop(x, y, text) {
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = text;
+  el.style.left = (x / canvas.width * 100) + '%';
+  el.style.top = (y / canvas.height * 100) + '%';
+  el.style.fontSize = '18px';
+  wrapper.appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+// ===== 描画 =====
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 空グラデ
+  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+  sky.addColorStop(0, '#1a3a0a');
+  sky.addColorStop(0.5, '#2d6b10');
+  sky.addColorStop(1, '#4a9a1a');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, groundY + 2);
+
+  // 太陽
+  const t = Date.now() * 0.001;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#f4d35e';
+  ctx.beginPath();
+  ctx.arc(W * 0.85, H * 0.12, 28, 0, Math.PI * 2);
+  ctx.fill();
+  // 光線
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + t * 0.3;
+    ctx.strokeStyle = '#f4d35e';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.85 + Math.cos(a) * 32, H * 0.12 + Math.sin(a) * 32);
+    ctx.lineTo(W * 0.85 + Math.cos(a) * 50, H * 0.12 + Math.sin(a) * 50);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 遠景ジャングル（シルエット）
+  drawBgLayer(bgLayers[0], groundY * 0.55, 0.45, '#1a4a05');
+  drawBgLayer(bgLayers[1], groundY * 0.75, 0.65, '#2d7a0a');
+
+  // 地面
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(0, groundY, W, H - groundY);
+
+  // 草ライン
+  ctx.fillStyle = '#4a9a1a';
+  ctx.fillRect(0, groundY, W, 10);
+  // 草の葉
+  ctx.fillStyle = '#5ab525';
+  for (let x = 0; x < W; x += 22) {
+    const wave = Math.sin(x * 0.08 + t) * 3;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY + wave);
+    ctx.lineTo(x + 6, groundY - 10 + wave);
+    ctx.lineTo(x + 12, groundY + wave);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 道（タイル）
+  ctx.fillStyle = '#8B6914';
+  ctx.fillRect(0, groundY + 8, W, H - groundY - 8);
+  // タイル線
+  const tileOff = (distance * 0.8) % 60;
+  ctx.strokeStyle = '#7a5a10';
+  ctx.lineWidth = 2;
+  for (let x = -tileOff; x < W; x += 60) {
+    ctx.beginPath();
+    ctx.moveTo(x, groundY + 8);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  // 障害物
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const ob of obstacles) {
+    const sc = 1 + Math.sin(ob.anim) * 0.04;
+    ctx.save();
+    ctx.translate(ob.x + ob.w / 2, ob.y + ob.h / 2);
+    ctx.scale(sc, sc);
+    ctx.font = `${ob.h * 0.95}px serif`;
+    ctx.fillText(ob.emoji, 0, 0);
+    ctx.restore();
+  }
+
+  // アイテム（ふわふわ浮かぶ）
+  for (const it of items) {
+    ctx.save();
+    const bobOff = Math.sin(it.bob) * 6;
+    ctx.translate(it.x, it.y + bobOff);
+    // 光るオーラ
+    ctx.globalAlpha = 0.3 + 0.2 * Math.abs(Math.sin(it.bob));
+    ctx.fillStyle = it.type === 'star' ? '#f4d35e' : '#ff6b6b';
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = '32px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(it.emoji, 0, 0);
+    ctx.restore();
+  }
+
+  // RUIくん＋カート
+  drawRui();
+
+  // スター無敵エフェクト（キラキラ）
+  if (kart.starTimer > 0) {
+    const t2 = Date.now() * 0.008;
+    ctx.save();
+    for (let i = 0; i < 5; i++) {
+      const a = t2 + i * 1.26;
+      const r = 40 + Math.sin(t2 * 2 + i) * 10;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#f4d35e';
+      ctx.font = '16px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⭐', kart.x + Math.cos(a) * r, kart.y + kart.h / 2 + Math.sin(a) * r * 0.5);
+    }
+    ctx.restore();
+  }
+
+  // ゴールバー（近づいたら表示）
+  const remain = goalDist * 100 - distance;
+  if (remain < 8000) {
+    const prog = 1 - remain / 8000;
+    ctx.save();
+    ctx.globalAlpha = prog;
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 18px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏁 ゴールまで ' + Math.max(0, Math.floor(remain / 100)) + 'm！', W / 2, H * 0.12);
+    ctx.restore();
+  }
+
+  // 無敵時の点滅オーバーレイ
+  if (invincible > 0 && Math.floor(invincible * 7) % 2 === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+}
+
+// ===== 背景レイヤー描画 =====
+function drawBgLayer(layer, y, scale, color) {
+  const t = Date.now() * 0.001;
+  for (const tree of layer.trees) {
+    ctx.save();
+    ctx.translate(tree.x, y);
+    ctx.scale(tree.size * scale, tree.size * scale);
+    ctx.fillStyle = color;
+    if (tree.type === 'palm') {
+      // ヤシの木シルエット
+      ctx.fillRect(-5, -80, 10, 80);
+      ctx.beginPath();
+      ctx.ellipse(-30, -80, 36, 18, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(25, -85, 30, 15, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -100, 28, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // 三角木シルエット
+      ctx.beginPath();
+      ctx.moveTo(0, -90);
+      ctx.lineTo(-40, 0);
+      ctx.lineTo(40, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, -60);
+      ctx.lineTo(-50, 20);
+      ctx.lineTo(50, 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ===== RUIくん描画 =====
+function drawRui() {
+  const t = Date.now() * 0.001;
+  const bumpY = kart.grounded ? Math.sin(kart.frame * 0.8) * 2 : 0;
+  const duckScale = kart.ducking ? 0.75 : 1.0;
+
+  ctx.save();
+  ctx.translate(kart.x, kart.y + kart.h + bumpY);
+  ctx.scale(1, duckScale);
+
+  // ===== カート =====
+  // 影
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(0, 8, kart.w * 0.45, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 車体（黒）
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.roundRect(-kart.w / 2, -kart.h * 0.55, kart.w, kart.h * 0.45, 10);
+  ctx.fill();
+
+  // 車体ハイライト
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.roundRect(-kart.w / 2 + 4, -kart.h * 0.52, kart.w - 8, 8, 4);
+  ctx.fill();
+
+  // ナンバープレート「RUI」
+  ctx.fillStyle = '#f4d35e';
+  ctx.beginPath();
+  ctx.roundRect(-20, -kart.h * 0.3, 40, 18, 3);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = '900 11px Nunito, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('RUI', 0, -kart.h * 0.3 + 9);
+
+  // タイヤ（回転アニメ）
+  const wheelRot = kart.grounded ? kart.frame : 0;
+  drawWheel(-kart.w * 0.35, 0, 14, wheelRot);
+  drawWheel(kart.w * 0.35, 0, 14, wheelRot);
+
+  // 排気ガス（走行中）
+  if (kart.grounded) {
+    ctx.save();
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(t * 8);
+    ctx.fillStyle = '#aaa';
+    ctx.beginPath();
+    ctx.arc(-kart.w / 2 - 8, -kart.h * 0.3, 5 + Math.random() * 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ===== RUIくん（上半身・右向き）=====
+  const bodyY = -kart.h * 0.55;
+  const hit = invincible > 0;
+
+  // 胴体：右向き（少し細め・奥行き感）
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.roundRect(-8, bodyY - 30, 24, 32, 6);
+  ctx.fill();
+
+  // 右腕（前に伸びてハンドルを握る）
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.roundRect(12, bodyY - 26, 18, 10, 5); ctx.fill();
+
+  // オーバーオール前掛け（右向き・少し右寄り）
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.roundRect(-5, bodyY - 28, 20, 28, 4);
+  ctx.fill();
+  // ポケット線
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+  ctx.strokeRect(-2, bodyY - 22, 14, 10);
+  // サスペンダーボタン（金色・右向きで1つ正面に）
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath(); ctx.arc(2, bodyY - 18, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(10, bodyY - 18, 3.5, 0, Math.PI * 2); ctx.fill();
+
+  // ===== 首 =====
+  ctx.fillStyle = '#f5d5a8';
+  ctx.beginPath(); ctx.roundRect(2, bodyY - 36, 10, 10, 3); ctx.fill();
+
+  // ===== 顔の輪郭（横向き・右向き）=====
+  ctx.fillStyle = '#fde8c0';
+  ctx.beginPath();
+  ctx.ellipse(4, bodyY - 52, 17, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 鼻先のふくらみ（右向き）
+  ctx.beginPath();
+  ctx.ellipse(19, bodyY - 48, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // あごのふくらみ
+  ctx.beginPath();
+  ctx.ellipse(12, bodyY - 34, 8, 6, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ほっぺ（右向きなので右ほっぺだけ見える）
+  ctx.fillStyle = '#f08080'; ctx.globalAlpha = 0.5;
+  ctx.beginPath(); ctx.arc(14, bodyY - 47, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 眉毛（横向き・右側）
+  ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(6, bodyY - 63); ctx.lineTo(16, bodyY - 65); ctx.stroke();
+
+  // 目（横向き・右側に1つ）
+  if (hit) {
+    ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(8, bodyY - 58); ctx.lineTo(14, bodyY - 52); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14, bodyY - 58); ctx.lineTo(8, bodyY - 52); ctx.stroke();
+  } else {
+    // 笑い目（細い弧）
+    ctx.strokeStyle = '#2a1808'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(11, bodyY - 53, 4, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  }
+
+  // 鼻（横から見た小さな点）
+  ctx.fillStyle = '#c8906a'; ctx.globalAlpha = 0.7;
+  ctx.beginPath(); ctx.arc(19, bodyY - 48, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 口（横向き・右側）
+  if (hit) {
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath(); ctx.ellipse(16, bodyY - 39, 4, 3, 0.3, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath(); ctx.ellipse(16, bodyY - 39, 6, 4, 0.2, 0, Math.PI); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.roundRect(11, bodyY - 40, 9, 3, 1); ctx.fill();
+    ctx.strokeStyle = '#8b2010'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.ellipse(16, bodyY - 39, 6, 4, 0.2, 0, Math.PI); ctx.stroke();
+  }
+
+  // ===== 髪（横向き・短い黒髪）=====
+  ctx.fillStyle = '#1e1008';
+  // 頭の丸みベース
+  ctx.beginPath();
+  ctx.arc(4, bodyY - 56, 18, Math.PI * 0.8, Math.PI * 2);
+  ctx.fill();
+  // 後頭部
+  ctx.beginPath(); ctx.arc(-10, bodyY - 54, 8, 0, Math.PI * 2); ctx.fill();
+  // 前髪（右向きなので前側）
+  ctx.beginPath();
+  ctx.moveTo(4, bodyY - 73);
+  ctx.quadraticCurveTo(18, bodyY - 72, 20, bodyY - 65);
+  ctx.quadraticCurveTo(20, bodyY - 60, 16, bodyY - 60);
+  ctx.quadraticCurveTo(10, bodyY - 63, 4, bodyY - 61);
+  ctx.quadraticCurveTo(-4, bodyY - 63, -10, bodyY - 68);
+  ctx.quadraticCurveTo(-14, bodyY - 72, -14, bodyY - 74);
+  ctx.closePath();
+  ctx.fill();
+
+  // ===== 帽子（右向き・つばが右前に出る）=====
+  ctx.fillStyle = '#111';
+  // 帽子本体
+  ctx.beginPath();
+  ctx.ellipse(4, bodyY - 67, 19, 13, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(-15, bodyY - 80, 38, 15, [10, 10, 0, 0]);
+  ctx.fill();
+  // つば（右側に長く出る）
+  ctx.beginPath();
+  ctx.ellipse(14, bodyY - 67, 16, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // つばの下側（少し明るく）
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.ellipse(14, bodyY - 65, 15, 4, 0, 0, Math.PI);
+  ctx.fill();
+  // ハチマキライン
+  ctx.fillStyle = '#222';
+  ctx.fillRect(-15, bodyY - 70, 38, 4);
+  // RUIラベル
+  ctx.fillStyle = '#fff';
+  ctx.font = '900 8px Nunito, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('RUI', 5, bodyY - 76);
+
+  // ===== ステアリングホイール（横から見た形・縦長楕円）=====
+  const hx = 22, hy = bodyY - 14;
+  // シャフト（ハンドルから手前に伸びる）
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(hx, hy + 6); ctx.lineTo(hx, hy + 18); ctx.stroke();
+
+  // 外リング（縦長楕円・横から見た形）
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.ellipse(hx, hy, 5, 14, 0, 0, Math.PI * 2); ctx.stroke();
+
+  // スポーク（横から見ると1本の横線）
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(hx - 5, hy); ctx.lineTo(hx + 5, hy); ctx.stroke();
+
+  // センターハブ
+  ctx.fillStyle = '#555';
+  ctx.beginPath(); ctx.ellipse(hx, hy, 3, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+  // ===== 白グローブ（ハンドルの上部を握る）=====
+  ctx.fillStyle = '#f0f0f0';
+  ctx.beginPath(); ctx.ellipse(hx, hy - 10, 7, 6, 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.stroke();
+  // 指のライン
+  ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(hx - 5, hy - 9); ctx.lineTo(hx - 6, hy - 5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx, hy - 14); ctx.lineTo(hx, hy - 9); ctx.stroke();
+  // 手首
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.roundRect(hx - 5, hy - 4, 10, 6, 3); ctx.fill();
+
+  ctx.restore();
+}
+
+function drawWheel(x, y, r, rot) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // タイヤ外側
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // タイヤ溝
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 4);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+  // ホイール
+  ctx.fillStyle = '#888';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ccc';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ===== HP・距離 表示 =====
+function updateHp() {
+  ['h1','h2','h3'].forEach((id,i) => {
+    document.getElementById(id).classList.toggle('lost', i >= hp);
+  });
+}
+function updateDist() {
+  const m = Math.floor(distance / 100);
+  document.getElementById('distDisplay').textContent = `🌲 ${m}m`;
+}
+
+// ===== ダメージエフェクト =====
+function spawnDmgFlash() {
+  const el = document.createElement('div');
+  el.className = 'dmg-flash';
+  wrapper.appendChild(el);
+  setTimeout(() => el.remove(), 300);
+}
+
+// ===== ゲームオーバー =====
+function gameOver(reason, type) {
+  state = 'gameover';
+  cancelAnimationFrame(animId);
+  const msgs = {
+    rock: '🪨 いわにぶつかった！',
+    cactus: '🌵 サボテンにぶつかった！',
+    log: '🪵 まるたにぶつかった！',
+    croc: '🐊 ワニにぶつかった！',
+  };
+  const msg = msgs[type] || '💥 クラッシュ！';
+  document.getElementById('goReason').textContent = msg;
+  document.getElementById('goScore').textContent =
+    `${STAGES[currentStage].label}　⏱ ${fmtTime(elapsedTime)}\n🏅 スコア：${score}　🌲 ${Math.floor(distance/100)}m / ${goalDist}m\nコンボ最大：${obstaclesCleared}かい`;
+  ['hud','hint','starHud','comboDisplay','speedDisplay'].forEach(id => { const el=document.getElementById(id); if(el) el.classList.add('hidden'); });
+  document.getElementById('gameoverScreen').classList.remove('hidden');
+}
+
+// ===== ステージクリア =====
+function stageClear() {
+  state = 'clear';
+  cancelAnimationFrame(animId);
+  ['hud','hint','starHud','comboDisplay','speedDisplay'].forEach(id => { const el=document.getElementById(id); if(el) el.classList.add('hidden'); });
+
+  // ボーナス計算
+  const timeBonus = Math.max(0, Math.floor((goalDist / elapsedTime) * 10));
+  const hpBonus = hp * 100;
+  const comboBonus = obstaclesCleared * 5;
+  score += timeBonus + hpBonus + comboBonus;
+
+  // ハイスコア判定
+  const isNewRecord = saveHS(currentStage, elapsedTime);
+  const isLastStage = currentStage >= STAGES.length - 1;
+
+  const scoreDetail = `⏱ タイム：${fmtTime(elapsedTime)}${isNewRecord ? ' 🆕新記録！' : ''}\n🏅 スコア：${score}\n❤️ ハートボーナス：+${hpBonus}　⚡タイムボーナス：+${timeBonus}\nよけた回数：${obstaclesCleared}かい`;
+
+  if (isLastStage) {
+    playSfx('allclear');
+    spawnConfetti();
+    document.getElementById('allClearScreen').innerHTML = `
+      <div class="end-emoji">🏆</div>
+      <div class="end-title" style="color:#f4d35e;">ぜんぶクリア！</div>
+      <div style="font-size:44px;margin:8px 0;">🌲🏎️🌲</div>
+      <div class="end-reason reason-clear">⭐ RUIくんさいきょう！ ⭐</div>
+      <div class="end-score" style="white-space:pre-line;">${scoreDetail}</div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn-green" onclick="showStageSelect()">🔄 もういちど</button>
+        <button class="btn-gray" onclick="showTitle()">🏠 タイトル</button>
+      </div>`;
+    document.getElementById('allClearScreen').classList.remove('hidden');
+  } else {
+    playSfx('clear');
+    spawnConfetti();
+    const nextStage = currentStage + 1;
+    const hsBadge = isNewRecord ? '<span class="hs-badge">🆕 新記録！</span>' : '';
+    document.getElementById('clearTitle').innerHTML = `${STAGES[currentStage].label} クリア！${hsBadge}`;
+    document.getElementById('clearReason').textContent = `🏁 ゴール！ ${goalDist}m 完走！`;
+    document.getElementById('clearScore').innerHTML =
+      `<span style="white-space:pre-line;">${scoreDetail}</span><br><br>つぎは ${STAGES[nextStage].name} だよ！🏎️`;
+    document.getElementById('clearBtns').innerHTML = `
+      <button class="btn-green" onclick="startWithCountdown(${nextStage})">▶ つぎのステージ！</button>
+      <button class="btn-gray" onclick="showStageSelect()">🗺️ えらびなおす</button>
+    `;
+    document.getElementById('clearScreen').classList.remove('hidden');
+  }
+}
+
+function spawnConfetti() {
+  const colors = ['#f4d35e','#ff6b6b','#4ecdc4','#a8e6cf','#90e0ef','#ff8fab'];
+  for (let i = 0; i < 50; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = Math.random() * 100 + '%';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+    el.style.animationDelay = Math.random() * 0.5 + 's';
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    wrapper.appendChild(el);
+    setTimeout(() => el.remove(), 3800);
+  }
+}
+</script>
+</body>
+</html>
