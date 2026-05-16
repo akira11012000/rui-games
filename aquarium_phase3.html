@@ -112,13 +112,17 @@
     <div class="title-text">おさかな水族館を<br>つくろう！</div>
     <div class="title-sub">ミニゲームをクリアしておさかなをあつめよう🐟<br>ぜんぶで10しゅるい！レアもいるよ✨</div>
     <button class="btn-start" onclick="showAquarium()">▶ はじめる！</button>
+    <a href="index.html" style="margin-top:16px;color:rgba(255,255,255,0.45);font-size:13px;font-weight:900;text-decoration:none;">🏠 メニューにもどる</a>
   </div>
 
   <!-- 水族館 -->
   <div class="screen hidden" id="aquaScreen">
     <canvas id="aquaCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
     <div id="aquaHud" style="position:absolute;top:0;left:0;right:0;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-      <div id="fishCount">🐠 0 ひき</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="hud-btn" onclick="showTitle()" style="background:rgba(255,255,255,0.12);color:#fff;font-size:13px;">🏠</button>
+        <div id="fishCount">🐠 0 ひき</div>
+      </div>
       <div class="hud-btns">
         <button class="hud-btn" id="btnZukan" onclick="showZukan()">📖 ずかん</button>
         <button class="hud-btn" id="btnGame" onclick="showSelect()">🎮 ゲームへ！</button>
@@ -290,7 +294,12 @@ function showAquarium(){
   let last=performance.now();
   (function loop(ts){const dt=Math.min((ts-last)/1000,0.05);last=ts;updateAqua(dt);renderAqua();aquaAnimId=requestAnimationFrame(loop);})(performance.now());
 }
-function showSelect(){hideAll();selectScreen.classList.remove('hidden');}
+function showTitle(){
+  cancelAnimationFrame(aquaAnimId);
+  hideAll();
+  titleScreen.classList.remove('hidden');
+}
+function showSelect(){hideAll();cancelAnimationFrame(aquaAnimId);selectScreen.classList.remove('hidden');}
 
 function initAquaBg(){
   const W=aquaCanvas.width,H=aquaCanvas.height;
