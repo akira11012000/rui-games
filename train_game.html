@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RUIくんの でんしゃをはしらせよう！</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; touch-action:none; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #87ceeb;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== ヘッダー ===== */
+  #header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px 8px;
+    flex-shrink: 0;
+  }
+  .hud-box {
+    font-size: clamp(15px, 4vw, 20px);
+    font-weight: 900;
+    background: rgba(255,255,255,0.88);
+    border-radius: 14px;
+    padding: 6px 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  #station-counter { color: #1a4fa0; }
+  #score-display   { color: #d04000; }
+
+  /* ===== ゲームキャンバス ===== */
+  #game-canvas {
+    flex: 1;
+    display: block;
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* ===== ボトムコントロール ===== */
+  #controls {
+    flex-shrink: 0;
+    padding: 10px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.15);
+  }
+  #stop-btn {
+    width: 100%;
+    max-width: 400px;
+    height: 78px;
+    font-family: 'Nunito', sans-serif;
+    font-size: clamp(26px, 7vw, 36px);
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(180deg, #ff6b35 0%, #d03800 100%);
+    border: none;
+    border-radius: 22px;
+    box-shadow: 0 6px 0 #9a2500;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #stop-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #9a2500; }
+  #stop-btn.pulse  { animation: btnPulse 0.55s ease-in-out infinite; }
+  @keyframes btnPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+  #stop-btn.disabled { background: linear-gradient(180deg,#aaa,#888); box-shadow:0 6px 0 #666; }
+
+  #hint-text {
+    font-size: clamp(12px, 3.2vw, 16px);
+    font-weight: 700;
+    color: #2a5020;
+    text-align: center;
+  }
+
+  /* ===== 結果ポップアップ ===== */
+  #result-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+  }
+  #result-overlay.active { display: flex; }
+  #result-popup {
+    background: #fff;
+    border-radius: 28px;
+    padding: 28px 36px 24px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    width: min(300px, 88vw);
+    animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popIn { from{transform:scale(0.4);opacity:0} to{transform:scale(1);opacity:1} }
+  #result-emoji  { font-size: 58px; display: block; line-height: 1.1; margin-bottom: 6px; }
+  #result-title  { font-size: clamp(22px, 6vw, 30px); font-weight: 900; margin-bottom: 4px; }
+  #result-stars  { font-size: 30px; min-height: 36px; margin-bottom: 8px; }
+  #result-msg    { font-size: clamp(13px, 3.5vw, 16px); color: #555; margin-bottom: 20px; }
+  #result-next-btn {
+    padding: 14px 32px;
+    font-family: 'Nunito', sans-serif;
+    font-size: clamp(17px, 4.5vw, 22px);
+    font-weight: 900;
+    color: #fff;
+    background: #43a047;
+    border: none;
+    border-radius: 50px;
+    box-shadow: 0 4px 0 #2e7d32;
+    cursor: pointer;
+  }
+  #result-next-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #2e7d32; }
+
+  /* ===== ゴール画面 ===== */
+  #complete-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #1565c0 0%, #42a5f5 50%, #ffd600 100%);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+    gap: 14px;
+  }
+  #complete-screen.active { display: flex; }
+  #complete-train  { font-size: clamp(60px, 18vw, 90px); animation: trainIn 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes trainIn { from{transform:translateX(-80vw)} to{transform:translateX(0)} }
+  #complete-title  { font-size: clamp(26px, 8vw, 42px); font-weight: 900; color: #fff; text-shadow: 2px 3px 0 rgba(0,0,0,0.18); }
+  #complete-stars  { font-size: clamp(30px, 9vw, 44px); }
+  #complete-score  { font-size: clamp(20px, 5.5vw, 28px); font-weight: 900; color: #fff;
+                     background: rgba(255,255,255,0.2); border-radius: 16px; padding: 10px 28px; }
+  #replay-btn {
+    padding: 18px 40px;
+    font-family: 'Nunito', sans-serif;
+    font-size: clamp(18px, 5vw, 24px);
+    font-weight: 900;
+    color: #1565c0;
+    background: #fff;
+    border: none;
+    border-radius: 50px;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  #replay-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div id="header">
+  <div class="hud-box" id="station-counter">🚉 1 / 5</div>
+  <div class="hud-box" id="score-display">⭐ 0</div>
+</div>
+
+<!-- ゲームキャンバス -->
+<canvas id="game-canvas"></canvas>
+
+<!-- ボタン -->
+<div id="controls">
+  <button id="stop-btn" ontouchstart="onStopTap(event)" onclick="onStopTap(event)">🛑 とまれ！</button>
+  <div id="hint-text">えきについたら「とまれ！」をおしてね 🚄</div>
+</div>
+
+<!-- 結果ポップアップ -->
+<div id="result-overlay">
+  <div id="result-popup">
+    <span id="result-emoji">🌟</span>
+    <div id="result-title">ぴったり！</div>
+    <div id="result-stars">⭐⭐⭐</div>
+    <div id="result-msg">かんぺきにとまれたよ！</div>
+    <button id="result-next-btn" ontouchstart="nextStation(event)" onclick="nextStation(event)">つぎのえきへ 🚄</button>
+  </div>
+</div>
+
+<!-- ゴール画面 -->
+<div id="complete-screen">
+  <div id="complete-train">🚄</div>
+  <div id="complete-title">🎉 ぜんぶのえき クリア！</div>
+  <div id="complete-stars">⭐⭐⭐⭐⭐</div>
+  <div id="complete-score">とくてん： 0</div>
+  <button id="replay-btn" ontouchstart="restartGame(event)" onclick="restartGame(event)">🚉 もういちど あそぶ</button>
+</div>
+
+<script>
+// ============================================================
+//  Safari 対応 roundRect ポリフィル
+// ============================================================
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    const rad = Array.isArray(r) ? (r[0] || 0) : (r || 0);
+    this.beginPath();
+    this.moveTo(x + rad, y);
+    this.lineTo(x + w - rad, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + rad);
+    this.lineTo(x + w, y + h - rad);
+    this.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    this.lineTo(x + rad, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - rad);
+    this.lineTo(x, y + rad);
+    this.quadraticCurveTo(x, y, x + rad, y);
+    this.closePath();
+    return this;
+  };
+}
+
+// ============================================================
+//  Canvas 初期化
+// ============================================================
+const canvas = document.getElementById('game-canvas');
+const ctx    = canvas.getContext('2d');
+let W, H, trackY, trackH;
+
+function resizeCanvas() {
+  W = canvas.clientWidth  || window.innerWidth;
+  H = canvas.clientHeight || window.innerHeight * 0.6;
+  canvas.width  = Math.round(W * devicePixelRatio);
+  canvas.height = Math.round(H * devicePixelRatio);
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  trackY = H * 0.42;
+  trackH = H * 0.20;
+}
+
+// ============================================================
+//  定数・設定
+// ============================================================
+const TOTAL_STATIONS = 5;
+const STATION_X_RATIO = 0.63;   // 駅の中心位置（画面幅の割合）
+const ZONE_OK      = 55;        // ±px : OK ゾーン
+const ZONE_GOOD    = 32;        // ±px : GOOD ゾーン
+const ZONE_PERFECT = 13;        // ±px : PERFECT ゾーン
+const TRAIN_W      = 240;
+const TRAIN_H      = 52;
+
+const STATION_DATA = [
+  { name: 'はなまちえき', col: '#ff8a65', roofCol: '#f4511e', emoji: '🌸' },
+  { name: 'うみえき',     col: '#42a5f5', roofCol: '#1565c0', emoji: '🌊' },
+  { name: 'もりえき',     col: '#66bb6a', roofCol: '#2e7d32', emoji: '🌲' },
+  { name: 'やまえき',     col: '#ffa726', roofCol: '#e65100', emoji: '⛰️' },
+  { name: 'RUIえき',      col: '#ec407a', roofCol: '#880e4f', emoji: '⭐' },
+];
+
+const TRAIN_BODY_COLS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa'];
+const SPEEDS          = [2.0, 2.8, 3.6, 4.4, 5.3]; // 駅ごとのスピード(px/frame)
+
+// ============================================================
+//  ゲーム状態
+// ============================================================
+let phase       = 'running'; // running | braking | stopped | result
+let stationNum  = 0;
+let score       = 0;
+let trainX      = -(TRAIN_W + 30);
+let trainSpeed  = 0;
+let btnEnabled  = true;
+let frameId     = null;
+
+// 雲
+let clouds = [];
+
+// フロートテキスト
+let floats = []; // {text, x, y, alpha, color, size}
+
+// ============================================================
+//  BGM（走行中のBGM）
+// ============================================================
+let _bgmCtx    = null;
+let _bgmNodes  = [];
+let _bgmTimer  = null;
+let _bgmActive = false;
+
+// メロディ [周波数Hz, 長さ秒]  BPM=120（1拍=0.5s、半拍=0.25s）
+const BGM_SEQ = [
+  [392,0.25],[440,0.25],[494,0.25],[392,0.25],   // ソラシソ
+  [392,0.25],[440,0.25],[494,0.50],               // ソラシ—
+  [494,0.25],[523,0.25],[587,0.25],[494,0.25],   // シドレシ
+  [523,0.25],[494,0.25],[440,0.50],               // ドシラ—
+  [440,0.25],[494,0.25],[523,0.25],[440,0.25],   // ラシドラ
+  [587,0.50],[523,0.25],[494,0.25],               // レ—ドシ
+  [392,0.25],[440,0.25],[494,0.25],[523,0.25],   // ソラシド
+  [392,1.00],                                     // ソ————
+];
+
+function _ensureBgmCtx() {
+  if (!_bgmCtx) _bgmCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_bgmCtx.state === 'suspended') _bgmCtx.resume();
+  return _bgmCtx;
+}
+
+function _bgmLoop() {
+  if (!_bgmActive) return;
+  const ac = _ensureBgmCtx();
+  let t = ac.currentTime + 0.05;
+  let total = 0;
+
+  BGM_SEQ.forEach(([freq, dur]) => {
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.13, t + 0.02);
+    gain.gain.setValueAtTime(0.13, t + dur * 0.80);
+    gain.gain.linearRampToValueAtTime(0, t + dur);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+    _bgmNodes.push(osc);
+    t += dur;
+    total += dur;
+  });
+
+  _bgmTimer = setTimeout(_bgmLoop, (total - 0.3) * 1000);
+}
+
+function startBGM() {
+  if (_bgmActive) return;
+  _bgmActive = true;
+  _bgmLoop();
+}
+
+function stopBGM() {
+  _bgmActive = false;
+  if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
+  _bgmNodes.forEach(n => { try { n.stop(0); } catch(e) {} });
+  _bgmNodes = [];
+}
+
+// ============================================================
+//  ヘルパー
+// ============================================================
+function stationCenterX() { return W * STATION_X_RATIO; }
+function trainCenterX()   { return trainX + TRAIN_W / 2; }
+function trainFrontX()    { return trainX + TRAIN_W; }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function judge() {
+  const dist = Math.abs(trainCenterX() - stationCenterX());
+  const stL  = stationCenterX() - ZONE_OK;
+  const stR  = stationCenterX() + ZONE_OK;
+  if (trainFrontX() < stL)  return 'early';   // 手前で止まった
+  if (trainX       > stR)   return 'late';    // 通り過ぎた
+  if (dist <= ZONE_PERFECT) return 'perfect';
+  if (dist <= ZONE_GOOD)    return 'good';
+  return 'ok';
+}
+
+function addFloat(text, color, size) {
+  floats.push({ text, x: W * 0.5, y: H * 0.38, alpha: 1, color, size: size || 28 });
+}
+
+function updateHeader() {
+  document.getElementById('station-counter').textContent = `🚉 ${stationNum+1} / ${TOTAL_STATIONS}`;
+  document.getElementById('score-display').textContent   = `⭐ ${score}`;
+}
+
+// ============================================================
+//  描画：背景・空
+// ============================================================
+function drawBG() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0,   '#5ba3d9');
+  grad.addColorStop(0.55,'#9fd3f0');
+  grad.addColorStop(1,   '#c5e8c0');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ============================================================
+//  描画：雲
+// ============================================================
+function drawClouds() {
+  clouds.forEach(c => {
+    ctx.save();
+    ctx.globalAlpha = 0.80;
+    ctx.fillStyle = '#fff';
+    const r = c.r;
+    const offsets = [[0,0],[r*0.85,r*0.18],[-r*0.85,r*0.18],[0,r*0.38]];
+    offsets.forEach(([dx,dy]) => {
+      ctx.beginPath();
+      ctx.arc(c.x+dx, c.y+dy, r*0.72, 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.restore();
+  });
+}
+
+// ============================================================
+//  描画：丘・地面
+// ============================================================
+function drawHills() {
+  const gy = trackY + trackH * 1.25;
+  ctx.save();
+  // 後ろの丘
+  ctx.fillStyle = '#5a9e50';
+  ctx.beginPath();
+  ctx.moveTo(-10, H);
+  ctx.bezierCurveTo(W*0.05, gy-40, W*0.25, gy-100, W*0.45, gy-40);
+  ctx.bezierCurveTo(W*0.65, gy+10, W*0.85, gy-65, W+10, gy-25);
+  ctx.lineTo(W+10, H);
+  ctx.closePath();
+  ctx.fill();
+  // 前の草地
+  ctx.fillStyle = '#68b85c';
+  ctx.fillRect(0, gy, W, H - gy);
+  ctx.restore();
+}
+
+// ============================================================
+//  描画：線路
+// ============================================================
+function drawTrack() {
+  const y  = trackY;
+  const h  = trackH;
+  const sx = stationCenterX();
+
+  // 砂利床
+  ctx.fillStyle = '#c9b89a';
+  ctx.fillRect(0, y + h*0.28, W, h*0.72);
+
+  // 枕木
+  ctx.fillStyle = '#8b6340';
+  const tieGap = 26;
+  for (let tx = (trainX % tieGap) - tieGap; tx < W + tieGap; tx += tieGap) {
+    ctx.fillRect(tx, y + h*0.08, 16, h*0.84);
+  }
+
+  // ストップゾーン（OK→GOOD→PERFECT の順に重ねる）
+  ctx.fillStyle = 'rgba(100,180,255,0.28)';
+  ctx.fillRect(sx - ZONE_OK, y + h*0.04, ZONE_OK*2, h*0.92);
+  ctx.fillStyle = 'rgba(80,210,80,0.38)';
+  ctx.fillRect(sx - ZONE_GOOD, y + h*0.04, ZONE_GOOD*2, h*0.92);
+  ctx.fillStyle = 'rgba(255,220,0,0.55)';
+  ctx.fillRect(sx - ZONE_PERFECT, y + h*0.04, ZONE_PERFECT*2, h*0.92);
+
+  // レール（2本）
+  ctx.fillStyle = '#b0b0b0';
+  ctx.fillRect(0, y + h*0.10, W, h*0.14);
+  ctx.fillRect(0, y + h*0.76, W, h*0.14);
+}
+
+// ============================================================
+//  描画：駅ホーム
+// ============================================================
+function drawStation() {
+  const st   = STATION_DATA[stationNum];
+  const sx   = stationCenterX();
+  const pw   = 130;
+  const ph   = 62;
+  const roofH = 20;
+  const py   = trackY - ph - roofH + 4;
+
+  ctx.save();
+
+  // ホーム本体
+  ctx.fillStyle = '#e8e0ce';
+  ctx.roundRect(sx - pw/2, py + roofH, pw, ph, 6);
+  ctx.fill();
+
+  // 屋根
+  ctx.fillStyle = st.roofCol;
+  ctx.fillRect(sx - pw/2 - 10, py, pw + 20, roofH + 4);
+  // 屋根の端（三角）
+  ctx.beginPath();
+  ctx.moveTo(sx - pw/2 - 10, py);
+  ctx.lineTo(sx - pw/2 - 22, py + roofH + 4);
+  ctx.lineTo(sx - pw/2 - 10, py + roofH + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(sx + pw/2 + 10, py);
+  ctx.lineTo(sx + pw/2 + 22, py + roofH + 4);
+  ctx.lineTo(sx + pw/2 + 10, py + roofH + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // 駅名看板
+  ctx.fillStyle = 'white';
+  ctx.font = `bold ${clamp(W*0.032, 11, 15)}px Nunito, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(st.emoji + ' ' + st.name, sx, py + roofH + 20);
+
+  // 駅番号
+  ctx.fillStyle = '#777';
+  ctx.font = `bold ${clamp(W*0.026, 10, 13)}px Nunito, sans-serif`;
+  ctx.fillText(`えき ${stationNum+1}`, sx, py + roofH + 44);
+
+  // 待っている乗客
+  ctx.font = `${clamp(W*0.055, 20, 26)}px serif`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('🧒', sx - 28, py + roofH + ph - 4);
+  ctx.fillText('👧', sx + 6,  py + roofH + ph - 4);
+
+  ctx.restore();
+}
+
+// ============================================================
+//  カラーユーティリティ
+// ============================================================
+function hexDarken(hex, amt) {
+  let r = parseInt(hex.slice(1,3),16);
+  let g = parseInt(hex.slice(3,5),16);
+  let b = parseInt(hex.slice(5,7),16);
+  r = Math.max(0, Math.round(r*(1-amt)));
+  g = Math.max(0, Math.round(g*(1-amt)));
+  b = Math.max(0, Math.round(b*(1-amt)));
+  return `rgb(${r},${g},${b})`;
+}
+function hexLighten(hex, amt) {
+  let r = parseInt(hex.slice(1,3),16);
+  let g = parseInt(hex.slice(3,5),16);
+  let b = parseInt(hex.slice(5,7),16);
+  r = Math.min(255, Math.round(r+(255-r)*amt));
+  g = Math.min(255, Math.round(g+(255-g)*amt));
+  b = Math.min(255, Math.round(b+(255-b)*amt));
+  return `rgb(${r},${g},${b})`;
+}
+
+// ============================================================
+//  描画：電車（全 canvas 描画・2車両新幹線スタイル）
+// ============================================================
+function drawTrain() {
+  const x = Math.round(trainX);
+  const y = Math.round(trackY + trackH * 0.05);
+  const w = TRAIN_W;   // 240
+  const h = TRAIN_H;   // 52（高さ固定）
+
+  ctx.save();
+
+  // ── スピードライン ──
+  if (trainSpeed > 1.8) {
+    const alpha = clamp((trainSpeed - 1.8) / 4.5, 0, 0.72);
+    [
+      { ratio: 0.12, len: 72, lw: 1.5 },
+      { ratio: 0.32, len: 96, lw: 2.2 },
+      { ratio: 0.52, len: 110, lw: 2.8 },
+      { ratio: 0.72, len: 96, lw: 2.2 },
+      { ratio: 0.88, len: 72, lw: 1.5 },
+    ].forEach(({ ratio, len, lw }) => {
+      const ly = y + h * ratio;
+      const lg = ctx.createLinearGradient(x - len - 10, ly, x - 4, ly);
+      lg.addColorStop(0, 'rgba(255,255,255,0)');
+      lg.addColorStop(1, `rgba(255,255,255,${alpha})`);
+      ctx.strokeStyle = lg; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(x - 4, ly); ctx.lineTo(x - 4 - len, ly); ctx.stroke();
+    });
+  }
+
+  // ===== 共通カラー（東海道新幹線イメージ） =====
+  const C_BODY  = '#edecea';   // クリーム白ボディ
+  const C_BLUE1 = '#0e4fa3';   // 濃い青帯
+  const C_BLUE2 = '#4a92d0';   // 薄い水色ライン
+  const C_WIN   = '#a8cfe8';   // 窓（水色）
+  const C_WINBR = '#78aec8';   // 窓枠
+
+  // ===== 後ろ車両（左側） =====
+  const c1W = Math.round(w * 0.52);   // 車両幅
+  const c1X = x;
+
+  // ボディ（左端を丸く）
+  ctx.fillStyle = C_BODY;
+  ctx.roundRect(c1X, y + h*0.04, c1W, h*0.92, [4, 0, 0, 4]);
+  ctx.fill();
+  // 濃い青帯（下部）
+  ctx.fillStyle = C_BLUE1;
+  ctx.fillRect(c1X, y + h*0.63, c1W, h*0.33);
+  // 薄い水色ライン
+  ctx.fillStyle = C_BLUE2;
+  ctx.fillRect(c1X, y + h*0.56, c1W, h*0.09);
+  // 窓 ×3
+  ctx.fillStyle = C_WIN;
+  [0.08, 0.34, 0.60].forEach(rx => {
+    ctx.beginPath();
+    ctx.roundRect(c1X + c1W * rx, y + h*0.12, c1W * 0.17, h*0.31, 3);
+    ctx.fill();
+    ctx.strokeStyle = C_WINBR; ctx.lineWidth = 1; ctx.stroke();
+  });
+  // 連結部（右端）
+  ctx.fillStyle = '#b0b0b0';
+  ctx.fillRect(c1X + c1W - 2, y + h*0.08, 4, h*0.84);
+
+  // ===== 前車両（右側） =====
+  const c2X   = c1X + c1W + 2;
+  const c2W   = w - c1W - 2;
+  const noseL = Math.round(h * 0.70);    // 丸みノーズの長さ（高さ基準）
+  const bodyRW = c2W - noseL;            // 矩形部分の幅
+  const noseX  = c2X + bodyRW;           // ノーズ開始X
+  const noseCY = y + h * 0.50;           // 縦中央
+
+  // ── クリップパス：矩形 + 楕円右半分 ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(c2X, y + h*0.04);
+  ctx.lineTo(noseX, y + h*0.04);
+  ctx.ellipse(noseX, noseCY, noseL, h * 0.46, 0, -Math.PI/2, Math.PI/2);
+  ctx.lineTo(c2X, y + h*0.96);
+  ctx.closePath();
+  ctx.clip();
+
+  // ボディ・青帯・水色ラインをクリップ内に描く
+  ctx.fillStyle = C_BODY;
+  ctx.fillRect(c2X, y, c2W + 10, h);
+  ctx.fillStyle = C_BLUE1;
+  ctx.fillRect(c2X, y + h*0.63, c2W + 10, h*0.33);
+  ctx.fillStyle = C_BLUE2;
+  ctx.fillRect(c2X, y + h*0.56, c2W + 10, h*0.09);
+
+  // 窓 ×2
+  ctx.fillStyle = C_WIN;
+  [0.06, 0.34].forEach(rx => {
+    ctx.beginPath();
+    ctx.roundRect(c2X + bodyRW * rx, y + h*0.12, bodyRW * 0.22, h*0.31, 3);
+    ctx.fill();
+    ctx.strokeStyle = C_WINBR; ctx.lineWidth = 1; ctx.stroke();
+  });
+
+  ctx.restore();   // クリップ解除
+
+  // 前面ライト（ノーズ先端付近）
+  ctx.fillStyle = '#fffbe0';
+  ctx.beginPath();
+  ctx.ellipse(noseX + noseL * 0.80, y + h*0.44, h*0.09, h*0.08, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#e83030';
+  ctx.beginPath();
+  ctx.ellipse(noseX + noseL * 0.80, y + h*0.44, h*0.055, h*0.05, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ============================================================
+//  描画：フロートテキスト
+// ============================================================
+function drawFloats() {
+  floats.forEach(f => {
+    if (f.alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = f.alpha;
+    ctx.font = `bold ${f.size}px Nunito, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.restore();
+  });
+}
+
+// ============================================================
+//  ゲームロジック
+// ============================================================
+function startStation() {
+  phase      = 'running';
+  trainX     = -(TRAIN_W + 40);
+  trainSpeed = SPEEDS[Math.min(stationNum, SPEEDS.length - 1)];
+  btnEnabled = true;
+  floats     = [];
+  document.getElementById('stop-btn').classList.remove('pulse','disabled');
+  document.getElementById('result-overlay').classList.remove('active');
+  updateHeader();
+  startBGM();
+}
+
+function onStopTap(e) {
+  if (e) e.preventDefault();
+  // Safari：ユーザー操作でAudioContextを再開
+  if (_bgmCtx && _bgmCtx.state === 'suspended') { _bgmCtx.resume(); }
+  if (!btnEnabled || phase !== 'running') return;
+  btnEnabled = false;
+  phase = 'braking';
+  document.getElementById('stop-btn').classList.remove('pulse');
+  document.getElementById('stop-btn').classList.add('disabled');
+}
+
+function resolveStop() {
+  const j = judge();
+
+  if (j === 'early') {
+    // 手前で止まった → 再加速して続ける
+    phase      = 'running';
+    trainSpeed = SPEEDS[Math.min(stationNum, SPEEDS.length-1)] * 0.65;
+    btnEnabled = true;
+    document.getElementById('stop-btn').classList.remove('disabled');
+    addFloat('もうちょっと！', '#ff9800', 26);
+    return;
+  }
+
+  // 結果判定
+  let emoji, title, stars, msg, pts, color;
+  switch (j) {
+    case 'perfect':
+      emoji='🌟'; title='ぴったり！';   stars='⭐⭐⭐'; msg='かんぺき！すごい！';     pts=100; color='#ffc400'; break;
+    case 'good':
+      emoji='✨'; title='じょうず！';   stars='⭐⭐';   msg='うまくとまれたね！';    pts=60;  color='#43a047'; break;
+    case 'ok':
+      emoji='😊'; title='とまれた！';   stars='⭐';     msg='えきにとめられたよ！'; pts=30;  color='#1e88e5'; break;
+    default: // late
+      emoji='🚦'; title='すぎちゃった！'; stars='';    msg='つぎはうまくいくよ！'; pts=10;  color='#9c27b0'; break;
+  }
+
+  score += pts;
+  phase = 'result';
+  stopBGM();
+
+  // フロートテキスト
+  const starTxt = stars ? stars + ' +' + pts : '+' + pts;
+  addFloat(starTxt, color, 30);
+
+  setTimeout(() => {
+    document.getElementById('result-emoji').textContent  = emoji;
+    document.getElementById('result-title').textContent  = title;
+    document.getElementById('result-title').style.color  = color;
+    document.getElementById('result-stars').textContent  = stars;
+    document.getElementById('result-msg').textContent    = msg;
+    const isLast = stationNum >= TOTAL_STATIONS - 1;
+    document.getElementById('result-next-btn').textContent = isLast ? '🎉 ゴール！' : 'つぎのえきへ 🚄';
+    document.getElementById('result-overlay').classList.add('active');
+    updateHeader();
+  }, 700);
+}
+
+function nextStation(e) {
+  if (e) e.preventDefault();
+  document.getElementById('result-overlay').classList.remove('active');
+  stationNum++;
+  if (stationNum >= TOTAL_STATIONS) {
+    showComplete();
+  } else {
+    startStation();
+  }
+}
+
+function showComplete() {
+  cancelAnimationFrame(frameId);
+  frameId = null;
+  stopBGM();  // ← リセットしないと再起動できなくなる
+  const starCount = Math.round(score / 50);
+  document.getElementById('complete-stars').textContent = '⭐'.repeat(clamp(starCount, 1, 8));
+  document.getElementById('complete-score').textContent = 'とくてん： ' + score;
+  document.getElementById('complete-screen').classList.add('active');
+}
+
+function restartGame(e) {
+  if (e) e.preventDefault();
+  document.getElementById('complete-screen').classList.remove('active');
+  stationNum = 0;
+  score      = 0;
+  floats     = [];
+  // 念のため既存のループを止めてから再起動
+  cancelAnimationFrame(frameId);
+  frameId = null;
+  startStation();
+  gameLoop();
+}
+
+// ============================================================
+//  メインループ
+// ============================================================
+function gameLoop() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 雲を流す
+  clouds.forEach(c => {
+    c.x -= c.speed;
+    if (c.x < -80) c.x = W + 80;
+  });
+
+  // 電車の動き
+  if (phase === 'running') {
+    trainX += trainSpeed;
+
+    // 駅に近づいたらボタンをパルス
+    const gap = stationCenterX() - trainFrontX();
+    if (gap > 0 && gap < 160) {
+      document.getElementById('stop-btn').classList.add('pulse');
+    } else {
+      document.getElementById('stop-btn').classList.remove('pulse');
+    }
+
+    // 通り過ぎ判定（ボタン未押しのまま）
+    if (btnEnabled && trainX > stationCenterX() + ZONE_OK + 15) {
+      btnEnabled = false;
+      trainSpeed = 0;
+      phase = 'result';
+      stopBGM();
+      document.getElementById('stop-btn').classList.remove('pulse','disabled');
+      const j = 'late';
+      score += 10;
+      addFloat('+10', '#9c27b0', 26);
+      setTimeout(() => {
+        document.getElementById('result-emoji').textContent  = '🚦';
+        document.getElementById('result-title').textContent  = 'すぎちゃった！';
+        document.getElementById('result-title').style.color  = '#9c27b0';
+        document.getElementById('result-stars').textContent  = '';
+        document.getElementById('result-msg').textContent    = 'つぎはうまくいくよ！';
+        const isLast = stationNum >= TOTAL_STATIONS - 1;
+        document.getElementById('result-next-btn').textContent = isLast ? '🎉 ゴール！' : 'つぎのえきへ 🚄';
+        document.getElementById('result-overlay').classList.add('active');
+        updateHeader();
+      }, 700);
+    }
+
+  } else if (phase === 'braking') {
+    trainSpeed *= 0.87;
+    trainX     += trainSpeed;
+    if (trainSpeed < 0.25) {
+      trainSpeed = 0;
+      resolveStop();
+    }
+  }
+
+  // フロートテキスト更新
+  floats.forEach(f => { f.y -= 0.9; f.alpha -= 0.013; });
+  floats = floats.filter(f => f.alpha > 0);
+
+  // 描画
+  drawBG();
+  drawClouds();
+  drawHills();
+  drawTrack();
+  drawStation();
+  drawTrain();
+  drawFloats();
+
+  frameId = requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+//  初期化
+// ============================================================
+function initClouds() {
+  clouds = [
+    { x: W*0.12, y: H*0.09, r: 32, speed: 0.30 },
+    { x: W*0.48, y: H*0.06, r: 24, speed: 0.20 },
+    { x: W*0.80, y: H*0.11, r: 28, speed: 0.25 },
+    { x: W*0.30, y: H*0.19, r: 20, speed: 0.17 },
+  ];
+}
+
+window.addEventListener('load', () => {
+  resizeCanvas();
+  initClouds();
+  startStation();
+  gameLoop();
+});
+
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  initClouds();
+});
+</script>
+</body>
+</html>
