@@ -75,7 +75,7 @@
   /* エフェクト */
   .dmg-flash { position:absolute; top:0;left:0;right:0;bottom:0; background:rgba(226,75,74,0.35); pointer-events:none; animation:dflash 0.3s ease-out forwards; }
   @keyframes dflash { 0%{opacity:1} 100%{opacity:0} }
-  .pop-text { position:absolute; font-size:20px; font-weight:900; font-family:'Nunito',sans-serif; pointer-events:none; animation:popup 0.8s ease-out forwards; transform:translateX(-50%); text-shadow:0 2px 6px rgba(0,0,0,0.5); }
+  .pop-text { position:absolute; z-index:11; font-size:20px; font-weight:900; font-family:'Nunito',sans-serif; pointer-events:none; animation:popup 0.8s ease-out forwards; transform:translateX(-50%); text-shadow:0 2px 6px rgba(0,0,0,0.5); }
   @keyframes popup { 0%{transform:translateX(-50%) translateY(0) scale(1.2);opacity:1} 100%{transform:translateX(-50%) translateY(-55px) scale(0.8);opacity:0} }
   .confetti { position:absolute; width:9px; height:9px; pointer-events:none; border-radius:2px; animation:cffall linear forwards; }
   @keyframes cffall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(900px) rotate(720deg);opacity:0} }
@@ -476,16 +476,16 @@ function update(dt){
     if(bug.type==='kamemushi') bug.x+=Math.sin(bug.anim*0.8)*0.8;
     if(bug.type==='kamakiri'){ bug.x+=bug.vx*dt; if(bug.x<20||bug.x>W-20) bug.vx*=-1; }
     if(bug.type==='imomushi') bug.y+=Math.sin(bug.anim*0.5)*0.4;
-    // ★ ヤモリにぶつかったときだけダメージ（スワイプでよけられる）
-    if(bug.alive&&Math.abs(bug.x-gecko.x)<32&&Math.abs(bug.y-gecko.y)<30){
+    // ★ ヤモリにぶつかったときだけダメージ（あたりはんていは小さめ＝よけやすい）
+    if(bug.alive&&Math.abs(bug.x-gecko.x)<20&&Math.abs(bug.y-gecko.y)<16){
       bug.alive=false;
       if(takeDamage()){ return; }
       spawnPop(gecko.x,gecko.y-46,'いたっ！','#ff6b6b');
     }
-    // 画面の下までにげられた（ダメージなし）
-    if(bug.alive&&bug.y>H){
+    // くさむらまでおりた＝にげられた（ダメージなし）
+    if(bug.alive&&bug.y>H-135){
       bug.alive=false;
-      spawnPop(bug.x,H-70,'💨 にげられた','rgba(255,255,255,0.55)');
+      spawnPop(Math.max(80,Math.min(W-150,bug.x)),H-150,'💨 にげられた','rgba(255,255,255,0.55)');
     }
   }
   bugs=bugs.filter(b=>b.alive);
@@ -496,7 +496,7 @@ function update(dt){
     if(boss.x<50||boss.x>W-50) boss.vx*=-1;
     boss.y+=Math.sin(boss.anim*0.6)*0.6;
     // ★ ボスもぶつかったときだけダメージ（当たったら少し上へもどる）
-    if(Math.abs(boss.x-gecko.x)<48&&Math.abs(boss.y-gecko.y)<44){
+    if(Math.abs(boss.x-gecko.x)<34&&Math.abs(boss.y-gecko.y)<30){
       if(takeDamage()){ return; }
       boss.y-=70;
       spawnPop(gecko.x,gecko.y-46,'いたっ！','#ff6b6b');
