@@ -13,6 +13,7 @@
   canvas { display:block; width:100%; height:100%; }
   .screen { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .screen.hidden { display:none; }
+  .hidden { display:none !important; }
 
   /* タイトル */
   #titleScreen { background:linear-gradient(180deg,#0d2200 0%,#1a4a05 60%,#2d7a0a 100%); }
@@ -44,12 +45,16 @@
   #itemHud { position:absolute; top:52px; left:0; right:0; text-align:center; pointer-events:none; }
 
   /* 操作ボタン */
-  #controls { position:absolute; bottom:0; left:0; right:0; padding:10px 16px 20px; display:flex; justify-content:center; align-items:center; gap:16px; z-index:10; pointer-events:auto; }
-  .ctrl-btn { border-radius:50%; border:none; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,0.4); transition:transform 0.08s; }
+  #controls { position:absolute; bottom:0; left:0; right:0; padding:10px 22px 26px; display:flex; justify-content:flex-end; align-items:center; gap:16px; z-index:10; pointer-events:none; }
+  .ctrl-btn { border-radius:50%; border:none; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,0.4); transition:transform 0.08s; pointer-events:auto; }
   .ctrl-btn:active { transform:scale(0.88); }
-  .btn-left  { background:rgba(255,255,255,0.18); color:#fff; font-size:32px; width:72px; height:72px; }
-  .btn-right { background:rgba(255,255,255,0.18); color:#fff; font-size:32px; width:72px; height:72px; }
-  .btn-fire  { background:linear-gradient(135deg,#ff6b6b,#c0392b); color:#fff; font-size:32px; width:84px; height:84px; }
+  .btn-fire  { background:linear-gradient(135deg,#ff6b6b,#c0392b); color:#fff; font-size:38px; width:92px; height:92px; }
+
+  /* スワイプそうさのヒント */
+  #swipeHint { position:absolute; bottom:225px; left:0; right:0; text-align:center; pointer-events:none; z-index:9; transition:opacity 0.6s; }
+  #swipeHint span { background:rgba(0,0,0,0.45); border-radius:18px; padding:7px 18px; color:#fff; font-size:13px; font-weight:900; display:inline-block; animation:hintslide 1.6s ease-in-out infinite; }
+  @keyframes hintslide { 0%,100%{transform:translateX(-10px)} 50%{transform:translateX(10px)} }
+  #swipeHint.fade { opacity:0; }
 
   /* 結果画面 */
   #gameoverScreen { background:rgba(10,30,5,0.93); backdrop-filter:blur(10px); }
@@ -114,10 +119,11 @@
 
   <!-- 操作ボタン -->
   <div id="controls" class="hidden">
-    <button class="ctrl-btn btn-left"  id="btnLeft">◀</button>
     <button class="ctrl-btn btn-fire"  id="btnFire">👅</button>
-    <button class="ctrl-btn btn-right" id="btnRight">▶</button>
   </div>
+
+  <!-- スワイプヒント -->
+  <div id="swipeHint" class="hidden"><span>👆 ゆびでスワイプしてうごかそう！</span></div>
 
   <!-- タイトル -->
   <div class="screen" id="titleScreen">
@@ -125,7 +131,7 @@
     <div class="title-main">ヤモリの<br>がいちゅうたいじ！</div>
     <div id="titleHs" style="color:#f4d35e;font-size:13px;font-weight:900;margin-bottom:6px;display:none;">🏆 ハイスコア：<span id="hsVal">0</span>てん</div>
     <div class="title-sub">
-      ◀▶でヤモリをうごかして<br>
+      👆 ゆびでスワイプしてヤモリをうごかして<br>
       👅で舌をはっしゃ！がいちゅうをやっつけよう🪲<br>
       🍀ダブルショット ⭐むてき ❤️かいふく
     </div>
@@ -239,22 +245,87 @@ const TONGUE_SPEED=480, TONGUE_COOLDOWN=0.3;
 let bugs=[], items=[], boss=null;
 let bugSpawnTimer=0, itemSpawnTimer=6;
 let fireflies=[];
-const keys={left:false,right:false,fire:false};
-let firePrev=false;
+const keys={fire:false};
+let firePulse=false;   // 1回タップぶんの発射よやく（すばやいタップでも必ず出る）
 
-// ===== ボタンイベント =====
-function addBtnEvents(id,key){
-  const el=document.getElementById(id);
-  el.addEventListener('touchstart',e=>{e.preventDefault();keys[key]=true;},{passive:false});
-  el.addEventListener('touchend',  e=>{e.preventDefault();keys[key]=false;},{passive:false});
-  el.addEventListener('mousedown', ()=>keys[key]=true);
-  el.addEventListener('mouseup',   ()=>keys[key]=false);
+// ===== ボタンイベント（👅 はっしゃ）=====
+function pressFire(){ keys.fire=true; firePulse=true; }
+function releaseFire(){ keys.fire=false; }
+(function(){
+  const el=document.getElementById('btnFire');
+  el.addEventListener('touchstart',e=>{e.preventDefault();pressFire();},{passive:false});
+  el.addEventListener('touchend',  e=>{e.preventDefault();releaseFire();},{passive:false});
+  el.addEventListener('touchcancel',releaseFire);
+  el.addEventListener('mousedown', pressFire);
+  el.addEventListener('mouseup',   releaseFire);
+  el.addEventListener('mouseleave',releaseFire);
+})();
+
+// ===== スワイプ操作（ゆびでヤモリをうごかす）=====
+let dragTouchId=null, dragStartX=0, dragStartGeckoX=0, mouseDragging=false;
+function canvasScaleX(){
+  const r=canvas.getBoundingClientRect();
+  return r.width>0 ? canvas.width/r.width : 1;
 }
-addBtnEvents('btnLeft','left'); addBtnEvents('btnRight','right'); addBtnEvents('btnFire','fire');
+function moveGeckoTo(x){
+  const W=canvas.width;
+  gecko.x=Math.max(gecko.w/2,Math.min(W-gecko.w/2,x));
+}
+function hideSwipeHint(){
+  const h=document.getElementById('swipeHint');
+  if(h && !h.classList.contains('hidden')) h.classList.add('fade');
+}
+function resetDrag(){ dragTouchId=null; mouseDragging=false; }
+
+// タッチ（スマホ）
+canvas.addEventListener('touchstart',e=>{
+  if(state!=='play') return;
+  if(dragTouchId!==null) return;
+  const t=e.changedTouches[0];
+  dragTouchId=t.identifier; dragStartX=t.clientX; dragStartGeckoX=gecko.x;
+  hideSwipeHint();
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  if(dragTouchId===null||state!=='play') return;
+  for(const t of e.changedTouches){
+    if(t.identifier===dragTouchId){
+      moveGeckoTo(dragStartGeckoX+(t.clientX-dragStartX)*canvasScaleX());
+      e.preventDefault();
+      break;
+    }
+  }
+},{passive:false});
+function endTouch(e){
+  if(dragTouchId===null) return;
+  for(const t of e.changedTouches){ if(t.identifier===dragTouchId){ dragTouchId=null; break; } }
+}
+canvas.addEventListener('touchend',endTouch);
+canvas.addEventListener('touchcancel',endTouch);
+
+// マウス（パソコン）
+canvas.addEventListener('mousedown',e=>{
+  if(state!=='play') return;
+  mouseDragging=true; dragStartX=e.clientX; dragStartGeckoX=gecko.x; hideSwipeHint();
+});
+window.addEventListener('mousemove',e=>{
+  if(!mouseDragging||state!=='play') return;
+  moveGeckoTo(dragStartGeckoX+(e.clientX-dragStartX)*canvasScaleX());
+});
+window.addEventListener('mouseup',()=>{ mouseDragging=false; });
+
+// キーボード（パソコンのおまけ操作）
+window.addEventListener('keydown',e=>{
+  if(state!=='play') return;
+  if(e.key==='ArrowLeft')  { moveGeckoTo(gecko.x-28); hideSwipeHint(); }
+  if(e.key==='ArrowRight') { moveGeckoTo(gecko.x+28); hideSwipeHint(); }
+  if(e.key===' '||e.key==='Spacebar'){ keys.fire=true; e.preventDefault(); }
+});
+window.addEventListener('keyup',e=>{ if(e.key===' '||e.key==='Spacebar') keys.fire=false; });
 
 // ===== 画面切替 =====
 function showTitle(){
-  ['gameoverScreen','clearScreen','allClearScreen','stageSelectScreen','hud','controls','itemHud','comboDisp','countdownDisp'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+  ['gameoverScreen','clearScreen','allClearScreen','stageSelectScreen','hud','controls','itemHud','comboDisp','swipeHint','countdownDisp'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
   document.getElementById('titleScreen').classList.remove('hidden');
   const best=Object.values(highScores).filter(v=>v!==null);
   if(best.length>0){
@@ -264,7 +335,7 @@ function showTitle(){
   state='title'; cancelAnimationFrame(animId);
 }
 function showStageSelect(){
-  ['titleScreen','gameoverScreen','clearScreen','allClearScreen','hud','controls','itemHud','comboDisp','countdownDisp'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+  ['titleScreen','gameoverScreen','clearScreen','allClearScreen','hud','controls','itemHud','comboDisp','swipeHint','countdownDisp'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
   [0,1,2].forEach(i=>{
     const el=document.getElementById(`hs${i}`);
     if(el) el.textContent=highScores[i]?`🏅${highScores[i]}てん`:'';
@@ -299,6 +370,11 @@ function startStage(stageIdx){
   document.getElementById('controls').classList.remove('hidden');
   document.getElementById('itemHud').classList.add('hidden');
   document.getElementById('stageDisp').textContent=stage.name;
+  // スワイプのヒントを数秒だけ表示
+  const hint=document.getElementById('swipeHint');
+  hint.classList.remove('hidden','fade');
+  setTimeout(()=>hint.classList.add('fade'),4000);
+  setTimeout(()=>hint.classList.add('hidden'),4800);
 
   state='play'; hp=3; score=0; killCount=0;
   tongues=[]; bugs=[]; items=[]; boss=null;
@@ -307,7 +383,7 @@ function startStage(stageIdx){
   invincible=false; invincibleTimer=0;
   combo=0; comboTimer=0; elapsedTime=0;
   bugSpawnTimer=0; itemSpawnTimer=6;
-  shootCooldown=0; keys.left=keys.right=keys.fire=false; firePrev=false;
+  shootCooldown=0; keys.fire=false; firePulse=false; resetDrag();
   document.getElementById('comboDisp').classList.add('hidden');
   document.getElementById('timerDisp').textContent='⏱ 0:00';
   document.getElementById('timerDisp').classList.remove('urgent');
@@ -342,9 +418,7 @@ function update(dt){
   // コンボタイマー
   if(comboTimer>0){ comboTimer-=dt; if(comboTimer<=0){ combo=0; document.getElementById('comboDisp').classList.add('hidden'); } }
 
-  // ヤモリ移動
-  if(keys.left)  gecko.x-=gecko.speed*dt;
-  if(keys.right) gecko.x+=gecko.speed*dt;
+  // ヤモリ移動（スワイプ操作。画面外に出ないように制限）
   gecko.x=Math.max(gecko.w/2,Math.min(W-gecko.w/2,gecko.x));
   gecko.frame+=dt*8;
 
@@ -354,7 +428,8 @@ function update(dt){
 
   // 発射
   if(shootCooldown>0) shootCooldown-=dt;
-  if(keys.fire&&!firePrev&&shootCooldown<=0){
+  if((keys.fire||firePulse)&&shootCooldown<=0){
+    firePulse=false;
     tongues.push({x:gecko.x,y:gecko.y-gecko.h*0.3,vy:-TONGUE_SPEED});
     if(doubleShot){
       tongues.push({x:gecko.x-18,y:gecko.y-gecko.h*0.3,vy:-TONGUE_SPEED});
@@ -362,7 +437,6 @@ function update(dt){
     }
     shootCooldown=TONGUE_COOLDOWN; playSfx('shoot');
   }
-  firePrev=keys.fire;
 
   // 舌
   for(const t of tongues) t.y+=t.vy*dt;
@@ -714,7 +788,7 @@ function spawnConfetti(){
 // ===== ゲームオーバー・クリア =====
 function gameOver(){
   state='gameover'; cancelAnimationFrame(animId);
-  ['hud','controls','itemHud','comboDisp'].forEach(id=>{ const e=document.getElementById(id); if(e)e.classList.add('hidden'); });
+  ['hud','controls','itemHud','comboDisp','swipeHint'].forEach(id=>{ const e=document.getElementById(id); if(e)e.classList.add('hidden'); });
   document.getElementById('goReason').textContent='🪲 がいちゅうにやられた！';
   document.getElementById('goScore').textContent=`スコア：${score}てん　⏱ ${fmtTime(elapsedTime)}\nやっつけた：${killCount} ひき`;
   document.getElementById('btnRetry').onclick=()=>startWithCountdown(currentStage);
@@ -723,7 +797,7 @@ function gameOver(){
 
 function stageClear(){
   state='clear'; cancelAnimationFrame(animId);
-  ['hud','controls','itemHud','comboDisp'].forEach(id=>{ const e=document.getElementById(id); if(e)e.classList.add('hidden'); });
+  ['hud','controls','itemHud','comboDisp','swipeHint'].forEach(id=>{ const e=document.getElementById(id); if(e)e.classList.add('hidden'); });
   const isLast=currentStage>=STAGES.length-1;
   const isNewRecord=saveHS(currentStage,score);
   const hpBonus=hp*80, timeBonus=Math.max(0,Math.floor(300/Math.max(1,elapsedTime)*10));
