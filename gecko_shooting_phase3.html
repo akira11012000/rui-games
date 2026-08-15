@@ -133,6 +133,7 @@
     <div class="title-sub">
       👆 ゆびでスワイプしてヤモリをうごかして<br>
       👅で舌をはっしゃ！がいちゅうをやっつけよう🪲<br>
+      ぶつかるとハートがへるよ！すばやくよけてね💨<br>
       🍀ダブルショット ⭐むてき ❤️かいふく
     </div>
     <button class="btn-start" onclick="showStageSelect()">▶ スタート！</button>
@@ -232,6 +233,16 @@ let state='title', hp=3, score=0, killCount=0, animId, lastTime=0;
 let bossSpawned=false, bossDefeated=false;
 let doubleShot=false, doubleShotTimer=0;
 let invincible=false, invincibleTimer=0;
+let hitCooldown=0;   // ダメージ直後のむてき時間（れんぞくでハートが減らないように）
+
+// ダメージしょり（へったら true）
+function takeDamage(){
+  if(invincible||hitCooldown>0) return false;
+  hp--; updateHp(); playSfx('damage'); spawnDmgFlash();
+  hitCooldown=1.4;
+  if(hp<=0){ gameOver(); return true; }
+  return false;
+}
 // フェーズ3追加
 let combo=0, comboTimer=0, elapsedTime=0;
 let highScores={0:null,1:null,2:null};
@@ -380,7 +391,7 @@ function startStage(stageIdx){
   tongues=[]; bugs=[]; items=[]; boss=null;
   bossSpawned=false; bossDefeated=false;
   doubleShot=false; doubleShotTimer=0;
-  invincible=false; invincibleTimer=0;
+  invincible=false; invincibleTimer=0; hitCooldown=0;
   combo=0; comboTimer=0; elapsedTime=0;
   bugSpawnTimer=0; itemSpawnTimer=6;
   shootCooldown=0; keys.fire=false; firePulse=false; resetDrag();
@@ -422,6 +433,9 @@ function update(dt){
   gecko.x=Math.max(gecko.w/2,Math.min(W-gecko.w/2,gecko.x));
   gecko.frame+=dt*8;
 
+  // ダメージ後のむてき時間
+  if(hitCooldown>0) hitCooldown-=dt;
+
   // アイテムタイマー
   if(doubleShotTimer>0){ doubleShotTimer-=dt; if(doubleShotTimer<=0){doubleShot=false;updateItemHud();} }
   if(invincibleTimer>0){ invincibleTimer-=dt; if(invincibleTimer<=0){invincible=false;updateItemHud();} }
@@ -462,11 +476,17 @@ function update(dt){
     if(bug.type==='kamemushi') bug.x+=Math.sin(bug.anim*0.8)*0.8;
     if(bug.type==='kamakiri'){ bug.x+=bug.vx*dt; if(bug.x<20||bug.x>W-20) bug.vx*=-1; }
     if(bug.type==='imomushi') bug.y+=Math.sin(bug.anim*0.5)*0.4;
-    if(bug.y>H-120&&!bug.passed){
-      bug.passed=true;
-      if(!invincible){ hp--; updateHp(); playSfx('damage'); spawnDmgFlash(); if(hp<=0){gameOver();return;} }
+    // ★ ヤモリにぶつかったときだけダメージ（スワイプでよけられる）
+    if(bug.alive&&Math.abs(bug.x-gecko.x)<32&&Math.abs(bug.y-gecko.y)<30){
+      bug.alive=false;
+      if(takeDamage()){ return; }
+      spawnPop(gecko.x,gecko.y-46,'いたっ！','#ff6b6b');
     }
-    if(bug.y>H) bug.alive=false;
+    // 画面の下までにげられた（ダメージなし）
+    if(bug.alive&&bug.y>H){
+      bug.alive=false;
+      spawnPop(bug.x,H-70,'💨 にげられた','rgba(255,255,255,0.55)');
+    }
   }
   bugs=bugs.filter(b=>b.alive);
 
@@ -475,10 +495,13 @@ function update(dt){
     boss.x+=boss.vx*dt; boss.anim+=dt*2;
     if(boss.x<50||boss.x>W-50) boss.vx*=-1;
     boss.y+=Math.sin(boss.anim*0.6)*0.6;
-    if(boss.y>H-120&&!boss.passed){
-      boss.passed=true;
-      if(!invincible){ hp--; updateHp(); playSfx('damage'); spawnDmgFlash(); if(hp<=0){gameOver();return;} }
+    // ★ ボスもぶつかったときだけダメージ（当たったら少し上へもどる）
+    if(Math.abs(boss.x-gecko.x)<48&&Math.abs(boss.y-gecko.y)<44){
+      if(takeDamage()){ return; }
+      boss.y-=70;
+      spawnPop(gecko.x,gecko.y-46,'いたっ！','#ff6b6b');
     }
+    if(boss.y>H+60) boss.y=H-200;   // 下に行きすぎたらもどす
   }
 
   // アイテム更新
@@ -557,12 +580,12 @@ function spawnBug(){
     imomushi: { emoji:'🐛', vy:40+Math.random()*30,  vx:0,  score:25, hp:2, w:36, h:26 },
   };
   const def={...defs[type],type};
-  bugs.push({...def,x:30+Math.random()*(W-60),y:-30,anim:Math.random()*Math.PI*2,alive:true,passed:false});
+  bugs.push({...def,x:30+Math.random()*(W-60),y:-30,anim:Math.random()*Math.PI*2,alive:true});
 }
 
 function spawnBoss(){
   const W=canvas.width;
-  boss={ emoji:'🦟', x:W/2, y:-50, vx:100, vy:0, anim:0, hp:5, maxHp:5, alive:true, passed:false };
+  boss={ emoji:'🦟', x:W/2, y:-50, vx:100, vy:0, anim:0, hp:5, maxHp:5, alive:true };
   bossSpawned=true;
   // ボスアラート
   const alert=document.createElement('div'); alert.className='boss-alert';
@@ -710,6 +733,7 @@ function drawGecko(){
   const x=gecko.x, y=gecko.y;
   const bob=Math.sin(gecko.frame*0.5)*2;
   ctx.save(); ctx.translate(x,y+bob);
+  if(hitCooldown>0) ctx.globalAlpha=Math.floor(Date.now()*0.012)%2===0?0.35:1;
 
   // 無敵エフェクト
   if(invincible){
